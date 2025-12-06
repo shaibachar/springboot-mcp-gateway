@@ -69,7 +69,7 @@ public class McpToolExecutionService {
 
         } catch (Exception e) {
             logger.error("Error executing tool: " + toolName, e);
-            return createErrorResponse("Error executing tool: " + e.getMessage());
+            return createErrorResponse("Error executing tool");
         }
     }
 
@@ -188,7 +188,7 @@ public class McpToolExecutionService {
             return new McpToolExecutionResponse(Collections.singletonList(content), false);
         } catch (Exception e) {
             logger.error("Error serializing result", e);
-            return createErrorResponse("Error serializing result: " + e.getMessage());
+            return createErrorResponse("Error processing result");
         }
     }
 

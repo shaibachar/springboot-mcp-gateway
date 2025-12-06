@@ -94,7 +94,7 @@ public class McpController {
 
         } catch (Exception e) {
             logger.error("Error executing tool: " + request.getName(), e);
-            McpToolExecutionResponse errorResponse = createErrorResponse("Internal error: " + e.getMessage());
+            McpToolExecutionResponse errorResponse = createErrorResponse("Internal error occurred");
             return ResponseEntity.internalServerError().body(errorResponse);
         }
     }
@@ -117,7 +117,7 @@ public class McpController {
 
         } catch (Exception e) {
             logger.error("Error refreshing tools", e);
-            return ResponseEntity.internalServerError().body("Error refreshing tools: " + e.getMessage());
+            return ResponseEntity.internalServerError().body("Error refreshing tools");
         }
     }
 
