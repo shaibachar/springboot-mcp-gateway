@@ -26,6 +26,9 @@ public class EndpointDiscoveryService implements ApplicationListener<ContextRefr
 
     private final RequestMappingHandlerMapping handlerMapping;
     private boolean contextRefreshed = false;
+    private List<EndpointMetadata> cachedEndpoints;
+    private long lastDiscoveryTimestamp;
+    private static final long CACHE_TTL_MILLIS = 5 * 60 * 1000; // 5 minutes
 
     /**
      * Constructor with dependency injection.
@@ -50,6 +53,12 @@ public class EndpointDiscoveryService implements ApplicationListener<ContextRefr
      * @return list of endpoint metadata
      */
     public List<EndpointMetadata> discoverEndpoints() {
+        long now = System.currentTimeMillis();
+        if (cachedEndpoints != null && (now - lastDiscoveryTimestamp) < CACHE_TTL_MILLIS) {
+            logger.debug("Returning {} cached REST endpoints", cachedEndpoints.size());
+            return new ArrayList<>(cachedEndpoints);
+        }
+
         logger.debug("Starting endpoint discovery");
         List<EndpointMetadata> endpoints = new ArrayList<>();
 
@@ -77,7 +86,17 @@ public class EndpointDiscoveryService implements ApplicationListener<ContextRefr
         }
 
         logger.debug("Endpoint discovery completed. Found {} endpoints", endpoints.size());
+        cachedEndpoints = endpoints;
+        lastDiscoveryTimestamp = now;
         return endpoints;
+    }
+
+    /**
+     * Clears cached discovery results.
+     */
+    public void clearCache() {
+        cachedEndpoints = null;
+        lastDiscoveryTimestamp = 0L;
     }
 
     /**

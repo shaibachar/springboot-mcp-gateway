@@ -65,6 +65,8 @@ public class McpToolMappingService {
      */
     public void refreshTools() {
         logger.debug("Refreshing MCP tools cache");
+        discoveryService.clearCache();
+        graphQLDiscoveryService.clearCache();
         cachedTools = null;
         getAllTools();
     }
@@ -78,9 +80,24 @@ public class McpToolMappingService {
     public McpTool findToolByName(String toolName) {
         logger.debug("Finding tool by name: {}", toolName);
         return getAllTools().stream()
-                .filter(tool -> tool.getName().equals(toolName))
+                .filter(tool -> namesMatch(tool.getName(), toolName))
                 .findFirst()
                 .orElse(null);
+    }
+
+    private boolean namesMatch(String candidate, String query) {
+        if (candidate == null || query == null) {
+            return false;
+        }
+        String normalizedCandidate = normalize(candidate);
+        String normalizedQuery = normalize(query);
+        return normalizedCandidate.equals(normalizedQuery)
+                || normalizedCandidate.contains(normalizedQuery)
+                || normalizedQuery.contains(normalizedCandidate);
+    }
+
+    private String normalize(String value) {
+        return value.toLowerCase().replaceAll("[^a-z0-9]", "");
     }
 
     /**
@@ -201,6 +218,8 @@ public class McpToolMappingService {
 
             String paramName = getGraphQLParameterName(param);
             Map<String, Object> paramSchema = generateParameterSchema(param);
+            paramSchema.put("nullable", !isGraphQLRequiredParameter(param));
+            paramSchema.put("graphqlType", param.getType().getSimpleName());
 
             properties.put(paramName, paramSchema);
 
@@ -365,6 +384,8 @@ public class McpToolMappingService {
             // For complex objects, use object type
             schema.put("type", "object");
         }
+
+        schema.put("javaType", type.getName());
 
         return schema;
     }

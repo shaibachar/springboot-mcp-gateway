@@ -1,6 +1,7 @@
 package com.shaibachar.springbootmcplib.model;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import jakarta.validation.constraints.NotBlank;
 import java.util.Map;
 
 /**
@@ -13,6 +14,7 @@ public class McpToolExecutionRequest {
     /**
      * The name of the tool to execute.
      */
+    @NotBlank(message = "Tool name is required")
     private String name;
 
     /**

@@ -5,10 +5,13 @@ import com.shaibachar.springbootmcplib.service.McpToolExecutionService;
 import com.shaibachar.springbootmcplib.service.McpToolMappingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * REST controller that exposes MCP (Model Context Protocol) endpoints.
@@ -69,19 +72,27 @@ public class McpController {
      * @return response containing the execution result
      */
     @PostMapping("/tools/execute")
-    public ResponseEntity<McpToolExecutionResponse> executeTool(@RequestBody McpToolExecutionRequest request) {
-        logger.debug("Received request to execute tool: {}", request.getName());
+    public ResponseEntity<McpToolExecutionResponse> executeTool(@Valid @RequestBody McpToolExecutionRequest request,
+                                                                BindingResult bindingResult) {
+        String requestId = UUID.randomUUID().toString();
+        logger.debug("Received request to execute tool: {} with correlation {}", request.getName(), requestId);
 
         try {
-            if (request.getName() == null || request.getName().isEmpty()) {
-                logger.error("Tool name is required");
-                McpToolExecutionResponse errorResponse = createErrorResponse("Tool name is required");
+            if (bindingResult.hasErrors()) {
+                logger.error("Validation failed for tool {}: {}", request.getName(), bindingResult.getAllErrors());
+                McpToolExecutionResponse errorResponse = createErrorResponse(
+                        "validation_error",
+                        requestId,
+                        "Tool name is required",
+                        bindingResult.getAllErrors()
+                );
                 return ResponseEntity.badRequest().body(errorResponse);
             }
 
             McpToolExecutionResponse response = toolExecutionService.executeTool(
                     request.getName(),
-                    request.getArguments()
+                    request.getArguments(),
+                    requestId
             );
 
             logger.debug("Tool execution completed: {}", request.getName());
@@ -94,7 +105,12 @@ public class McpController {
 
         } catch (Exception e) {
             logger.error("Error executing tool: " + request.getName(), e);
-            McpToolExecutionResponse errorResponse = createErrorResponse("Internal error occurred");
+            McpToolExecutionResponse errorResponse = createErrorResponse(
+                    "internal_error",
+                    requestId,
+                    "Internal error occurred",
+                    null
+            );
             return ResponseEntity.internalServerError().body(errorResponse);
         }
     }
@@ -127,9 +143,9 @@ public class McpController {
      * @param errorMessage the error message
      * @return the error response
      */
-    private McpToolExecutionResponse createErrorResponse(String errorMessage) {
+    private McpToolExecutionResponse createErrorResponse(String errorCode, String requestId, String errorMessage, Object details) {
         McpToolExecutionResponse.ContentItem content =
                 new McpToolExecutionResponse.ContentItem("text", errorMessage);
-        return new McpToolExecutionResponse(java.util.Collections.singletonList(content), true);
+        return new McpToolExecutionResponse(java.util.Collections.singletonList(content), errorCode, requestId, details);
     }
 }
