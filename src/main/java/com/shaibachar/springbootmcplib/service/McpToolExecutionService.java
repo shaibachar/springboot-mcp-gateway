@@ -54,8 +54,8 @@ public class McpToolExecutionService {
      * @param arguments the input arguments
      * @return the execution response
      */
-    public McpToolExecutionResponse executeTool(String toolName, Map<String, Object> arguments) {
-        logger.debug("Executing tool: {} with arguments: {}", toolName, arguments);
+    public McpToolExecutionResponse executeTool(String toolName, Map<String, Object> arguments, String requestId) {
+        logger.debug("Executing tool: {} with arguments: {} (requestId={})", toolName, arguments, requestId);
 
         try {
             // Check if it's a GraphQL tool
@@ -63,7 +63,7 @@ public class McpToolExecutionService {
                 GraphQLEndpointMetadata graphqlEndpoint = findGraphQLEndpointForTool(toolName);
                 if (graphqlEndpoint != null) {
                     Object result = invokeGraphQLEndpoint(graphqlEndpoint, arguments);
-                    return createSuccessResponse(result);
+                    return createSuccessResponse(result, requestId);
                 }
             }
             
@@ -71,18 +71,18 @@ public class McpToolExecutionService {
             EndpointMetadata endpoint = findEndpointForTool(toolName);
             if (endpoint == null) {
                 logger.error("Tool not found: {}", toolName);
-                return createErrorResponse("Tool not found: " + toolName);
+                return createErrorResponse("tool_not_found", requestId, "Tool not found: " + toolName, null);
             }
 
             // Invoke the endpoint
             Object result = invokeEndpoint(endpoint, arguments);
 
             // Convert result to response
-            return createSuccessResponse(result);
+            return createSuccessResponse(result, requestId);
 
         } catch (Exception e) {
             logger.error("Error executing tool: " + toolName, e);
-            return createErrorResponse("Error executing tool: " + e.getMessage());
+            return createErrorResponse("execution_error", requestId, "Error executing tool: " + e.getMessage(), null);
         }
     }
 
@@ -97,7 +97,7 @@ public class McpToolExecutionService {
 
         for (EndpointMetadata endpoint : endpoints) {
             String generatedName = EndpointUtils.generateToolName(endpoint);
-            if (generatedName.equals(toolName)) {
+            if (namesMatch(generatedName, toolName)) {
                 logger.debug("Found endpoint for tool {}: {}", toolName, endpoint);
                 return endpoint;
             }
@@ -117,7 +117,7 @@ public class McpToolExecutionService {
 
         for (GraphQLEndpointMetadata endpoint : endpoints) {
             String generatedName = generateGraphQLToolName(endpoint);
-            if (generatedName.equals(toolName)) {
+            if (namesMatch(generatedName, toolName)) {
                 logger.debug("Found GraphQL endpoint for tool {}: {}", toolName, endpoint);
                 return endpoint;
             }
@@ -304,16 +304,18 @@ public class McpToolExecutionService {
      * @param result the result object
      * @return the execution response
      */
-    private McpToolExecutionResponse createSuccessResponse(Object result) {
+    private McpToolExecutionResponse createSuccessResponse(Object result, String requestId) {
         try {
             String resultText = objectMapper.writeValueAsString(result);
-            McpToolExecutionResponse.ContentItem content = 
+            McpToolExecutionResponse.ContentItem content =
                 new McpToolExecutionResponse.ContentItem("text", resultText);
-            
-            return new McpToolExecutionResponse(Collections.singletonList(content), false);
+
+            McpToolExecutionResponse response = new McpToolExecutionResponse(Collections.singletonList(content), false);
+            response.setRequestId(requestId);
+            return response;
         } catch (Exception e) {
             logger.error("Error serializing result", e);
-            return createErrorResponse("Error processing result");
+            return createErrorResponse("serialization_error", requestId, "Error processing result", null);
         }
     }
 
@@ -323,10 +325,25 @@ public class McpToolExecutionService {
      * @param errorMessage the error message
      * @return the execution response
      */
-    private McpToolExecutionResponse createErrorResponse(String errorMessage) {
-        McpToolExecutionResponse.ContentItem content = 
+    private McpToolExecutionResponse createErrorResponse(String errorCode, String requestId, String errorMessage, Object details) {
+        McpToolExecutionResponse.ContentItem content =
             new McpToolExecutionResponse.ContentItem("text", errorMessage);
-        
-        return new McpToolExecutionResponse(Collections.singletonList(content), true);
+
+        return new McpToolExecutionResponse(Collections.singletonList(content), errorCode, requestId, details);
+    }
+
+    private boolean namesMatch(String candidate, String query) {
+        if (candidate == null || query == null) {
+            return false;
+        }
+        String normalizedCandidate = normalize(candidate);
+        String normalizedQuery = normalize(query);
+        return normalizedCandidate.equals(normalizedQuery)
+                || normalizedCandidate.contains(normalizedQuery)
+                || normalizedQuery.contains(normalizedCandidate);
+    }
+
+    private String normalize(String value) {
+        return value.toLowerCase().replaceAll("[^a-z0-9]", "");
     }
 }

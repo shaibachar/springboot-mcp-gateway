@@ -21,6 +21,21 @@ public class McpToolExecutionResponse {
     private Boolean isError;
 
     /**
+     * Optional machine-readable error code.
+     */
+    private String errorCode;
+
+    /**
+     * Correlation identifier to connect logs to client responses.
+     */
+    private String requestId;
+
+    /**
+     * Optional structured error details (e.g., validation failures).
+     */
+    private Object details;
+
+    /**
      * Default constructor for JSON deserialization.
      */
     public McpToolExecutionResponse() {
@@ -45,6 +60,22 @@ public class McpToolExecutionResponse {
     public McpToolExecutionResponse(List<ContentItem> content, Boolean isError) {
         this.content = content;
         this.isError = isError;
+    }
+
+    /**
+     * Constructor for a detailed error response.
+     *
+     * @param content the error content
+     * @param errorCode stable error code for clients
+     * @param requestId correlation id for diagnostics
+     * @param details optional structured details (maps, lists, or DTOs)
+     */
+    public McpToolExecutionResponse(List<ContentItem> content, String errorCode, String requestId, Object details) {
+        this.content = content;
+        this.isError = true;
+        this.errorCode = errorCode;
+        this.requestId = requestId;
+        this.details = details;
     }
 
     /**
@@ -81,6 +112,30 @@ public class McpToolExecutionResponse {
      */
     public void setIsError(Boolean isError) {
         this.isError = isError;
+    }
+
+    public String getErrorCode() {
+        return errorCode;
+    }
+
+    public void setErrorCode(String errorCode) {
+        this.errorCode = errorCode;
+    }
+
+    public String getRequestId() {
+        return requestId;
+    }
+
+    public void setRequestId(String requestId) {
+        this.requestId = requestId;
+    }
+
+    public Object getDetails() {
+        return details;
+    }
+
+    public void setDetails(Object details) {
+        this.details = details;
     }
 
     @Override
