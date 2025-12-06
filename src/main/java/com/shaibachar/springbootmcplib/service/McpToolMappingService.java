@@ -2,6 +2,7 @@ package com.shaibachar.springbootmcplib.service;
 
 import com.shaibachar.springbootmcplib.model.EndpointMetadata;
 import com.shaibachar.springbootmcplib.model.McpTool;
+import com.shaibachar.springbootmcplib.util.EndpointUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -100,7 +101,7 @@ public class McpToolMappingService {
      * @return the MCP tool
      */
     private McpTool createToolFromEndpoint(EndpointMetadata endpoint) {
-        String toolName = generateToolName(endpoint);
+        String toolName = EndpointUtils.generateToolName(endpoint);
         String description = generateDescription(endpoint);
         Map<String, Object> inputSchema = generateInputSchema(endpoint);
 
@@ -108,25 +109,6 @@ public class McpToolMappingService {
             toolName, endpoint.getFullPath(), endpoint.getHttpMethod());
 
         return new McpTool(toolName, description, inputSchema);
-    }
-
-    /**
-     * Generates a unique tool name from the endpoint.
-     *
-     * @param endpoint the endpoint metadata
-     * @return the tool name
-     */
-    private String generateToolName(EndpointMetadata endpoint) {
-        // Format: httpMethod_path_methodName
-        String method = endpoint.getHttpMethod().name().toLowerCase();
-        String path = endpoint.getFullPath()
-                .replaceAll("[^a-zA-Z0-9/]", "_")
-                .replaceAll("/", "_")
-                .replaceAll("_+", "_")
-                .replaceAll("^_|_$", "");
-        String methodName = endpoint.getHandlerMethod().getName();
-
-        return method + "_" + path + "_" + methodName;
     }
 
     /**
@@ -161,12 +143,12 @@ public class McpToolMappingService {
 
         for (Parameter param : parameters) {
             // Skip special Spring parameters
-            if (isSpecialParameter(param)) {
+            if (EndpointUtils.isSpecialParameter(param)) {
                 logger.debug("Skipping special parameter: {}", param.getType().getSimpleName());
                 continue;
             }
 
-            String paramName = getParameterName(param);
+            String paramName = EndpointUtils.getParameterName(param);
             Map<String, Object> paramSchema = generateParameterSchema(param);
 
             properties.put(paramName, paramSchema);
@@ -216,53 +198,6 @@ public class McpToolMappingService {
         }
 
         return schema;
-    }
-
-    /**
-     * Checks if a parameter is a special Spring framework parameter.
-     *
-     * @param param the parameter
-     * @return true if it's a special parameter
-     */
-    private boolean isSpecialParameter(Parameter param) {
-        Class<?> type = param.getType();
-        String typeName = type.getName();
-
-        // Skip Spring-specific types
-        return typeName.startsWith("org.springframework.web.context") ||
-               typeName.startsWith("org.springframework.http.HttpServletRequest") ||
-               typeName.startsWith("org.springframework.http.HttpServletResponse") ||
-               typeName.startsWith("javax.servlet") ||
-               typeName.startsWith("jakarta.servlet");
-    }
-
-    /**
-     * Gets the parameter name from annotations or reflection.
-     *
-     * @param param the parameter
-     * @return the parameter name
-     */
-    private String getParameterName(Parameter param) {
-        // Check for @PathVariable
-        PathVariable pathVariable = param.getAnnotation(PathVariable.class);
-        if (pathVariable != null && !pathVariable.value().isEmpty()) {
-            return pathVariable.value();
-        }
-
-        // Check for @RequestParam
-        RequestParam requestParam = param.getAnnotation(RequestParam.class);
-        if (requestParam != null && !requestParam.value().isEmpty()) {
-            return requestParam.value();
-        }
-
-        // Check for @RequestBody
-        RequestBody requestBody = param.getAnnotation(RequestBody.class);
-        if (requestBody != null) {
-            return "body";
-        }
-
-        // Fallback to parameter name from reflection
-        return param.getName();
     }
 
     /**

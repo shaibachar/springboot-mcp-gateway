@@ -39,15 +39,10 @@ class McpIntegrationTest {
                 .andReturn();
 
         String content = result.getResponse().getContentAsString();
-        System.out.println("List tools response: " + content);
         McpToolsResponse response = objectMapper.readValue(content, McpToolsResponse.class);
 
         assertNotNull(response);
         assertNotNull(response.getTools());
-        
-        // Print all discovered tools for debugging
-        System.out.println("Discovered " + response.getTools().size() + " tools:");
-        response.getTools().forEach(tool -> System.out.println("  - " + tool.getName()));
         
         assertTrue(response.getTools().size() > 0, "Should discover at least one tool");
 

@@ -3,6 +3,7 @@ package com.shaibachar.springbootmcplib.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shaibachar.springbootmcplib.model.EndpointMetadata;
 import com.shaibachar.springbootmcplib.model.McpToolExecutionResponse;
+import com.shaibachar.springbootmcplib.util.EndpointUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
@@ -82,7 +83,7 @@ public class McpToolExecutionService {
         List<EndpointMetadata> endpoints = discoveryService.discoverEndpoints();
 
         for (EndpointMetadata endpoint : endpoints) {
-            String generatedName = generateToolName(endpoint);
+            String generatedName = EndpointUtils.generateToolName(endpoint);
             if (generatedName.equals(toolName)) {
                 logger.debug("Found endpoint for tool {}: {}", toolName, endpoint);
                 return endpoint;
@@ -90,24 +91,6 @@ public class McpToolExecutionService {
         }
 
         return null;
-    }
-
-    /**
-     * Generates the tool name from endpoint (must match McpToolMappingService).
-     *
-     * @param endpoint the endpoint metadata
-     * @return the tool name
-     */
-    private String generateToolName(EndpointMetadata endpoint) {
-        String method = endpoint.getHttpMethod().name().toLowerCase();
-        String path = endpoint.getFullPath()
-                .replaceAll("[^a-zA-Z0-9/]", "_")
-                .replaceAll("/", "_")
-                .replaceAll("_+", "_")
-                .replaceAll("^_|_$", "");
-        String methodName = endpoint.getHandlerMethod().getName();
-
-        return method + "_" + path + "_" + methodName;
     }
 
     /**
@@ -151,12 +134,12 @@ public class McpToolExecutionService {
             Parameter param = parameters[i];
 
             // Skip special Spring parameters
-            if (isSpecialParameter(param)) {
+            if (EndpointUtils.isSpecialParameter(param)) {
                 methodArgs[i] = null;
                 continue;
             }
 
-            String paramName = getParameterName(param);
+            String paramName = EndpointUtils.getParameterName(param);
             Object value = arguments != null ? arguments.get(paramName) : null;
 
             // Convert value to parameter type
@@ -188,48 +171,6 @@ public class McpToolExecutionService {
 
         // Use Jackson for complex type conversion
         return objectMapper.convertValue(value, targetType);
-    }
-
-    /**
-     * Gets the parameter name from annotations.
-     *
-     * @param param the parameter
-     * @return the parameter name
-     */
-    private String getParameterName(Parameter param) {
-        PathVariable pathVariable = param.getAnnotation(PathVariable.class);
-        if (pathVariable != null && !pathVariable.value().isEmpty()) {
-            return pathVariable.value();
-        }
-
-        RequestParam requestParam = param.getAnnotation(RequestParam.class);
-        if (requestParam != null && !requestParam.value().isEmpty()) {
-            return requestParam.value();
-        }
-
-        RequestBody requestBody = param.getAnnotation(RequestBody.class);
-        if (requestBody != null) {
-            return "body";
-        }
-
-        return param.getName();
-    }
-
-    /**
-     * Checks if a parameter is a special Spring parameter.
-     *
-     * @param param the parameter
-     * @return true if special
-     */
-    private boolean isSpecialParameter(Parameter param) {
-        Class<?> type = param.getType();
-        String typeName = type.getName();
-
-        return typeName.startsWith("org.springframework.web.context") ||
-               typeName.startsWith("org.springframework.http.HttpServletRequest") ||
-               typeName.startsWith("org.springframework.http.HttpServletResponse") ||
-               typeName.startsWith("javax.servlet") ||
-               typeName.startsWith("jakarta.servlet");
     }
 
     /**
