@@ -20,7 +20,6 @@ import java.util.*;
  * endpoint metadata.
  * Implements ApplicationListener to ensure discovery happens after context is fully initialized.
  */
-@Component
 public class EndpointDiscoveryService implements ApplicationListener<ContextRefreshedEvent> {
 
     private static final Logger logger = LoggerFactory.getLogger(EndpointDiscoveryService.class);

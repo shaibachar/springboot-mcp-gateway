@@ -15,7 +15,6 @@ import java.util.*;
  * Service responsible for mapping REST endpoints to MCP tools.
  * Converts Spring MVC endpoint metadata into MCP tool definitions with JSON schemas.
  */
-@Service
 public class McpToolMappingService {
 
     private static final Logger logger = LoggerFactory.getLogger(McpToolMappingService.class);
@@ -87,7 +86,8 @@ public class McpToolMappingService {
                 tools.add(tool);
                 logger.debug("Mapped endpoint to tool: {}", tool.getName());
             } catch (Exception e) {
-                logger.error("Error mapping endpoint to tool: " + endpoint, e);
+                logger.error("Error mapping endpoint: {} {}", 
+                    endpoint.getHttpMethod(), endpoint.getFullPath(), e);
             }
         }
 

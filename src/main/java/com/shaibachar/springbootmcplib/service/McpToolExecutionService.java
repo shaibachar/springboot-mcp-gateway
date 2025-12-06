@@ -18,7 +18,6 @@ import java.util.*;
  * Service responsible for executing MCP tools by invoking the corresponding REST endpoints.
  * Handles parameter mapping and method invocation.
  */
-@Service
 public class McpToolExecutionService {
 
     private static final Logger logger = LoggerFactory.getLogger(McpToolExecutionService.class);
@@ -113,8 +112,7 @@ public class McpToolExecutionService {
 
         logger.debug("Invoking method {} with {} arguments", method.getName(), methodArgs.length);
 
-        // Invoke the method
-        method.setAccessible(true);
+        // Invoke the method (controller methods are public, so no accessibility changes needed)
         return method.invoke(controller, methodArgs);
     }
 
