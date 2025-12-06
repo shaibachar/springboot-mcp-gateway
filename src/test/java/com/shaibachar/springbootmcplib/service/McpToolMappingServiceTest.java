@@ -24,12 +24,15 @@ class McpToolMappingServiceTest {
     @Mock
     private EndpointDiscoveryService discoveryService;
 
+    @Mock
+    private GraphQLDiscoveryService graphQLDiscoveryService;
+
     private McpToolMappingService mappingService;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        mappingService = new McpToolMappingService(discoveryService);
+        mappingService = new McpToolMappingService(discoveryService, graphQLDiscoveryService);
     }
 
     @Test
@@ -45,6 +48,7 @@ class McpToolMappingServiceTest {
         );
 
         when(discoveryService.discoverEndpoints()).thenReturn(Collections.singletonList(endpoint));
+        when(graphQLDiscoveryService.discoverGraphQLEndpoints()).thenReturn(Collections.emptyList());
 
         List<McpTool> tools = mappingService.getAllTools();
 
@@ -72,6 +76,7 @@ class McpToolMappingServiceTest {
         );
 
         when(discoveryService.discoverEndpoints()).thenReturn(Collections.singletonList(endpoint));
+        when(graphQLDiscoveryService.discoverGraphQLEndpoints()).thenReturn(Collections.emptyList());
 
         // Call twice
         mappingService.getAllTools();
@@ -79,6 +84,7 @@ class McpToolMappingServiceTest {
 
         // discoveryService should only be called once (caching)
         verify(discoveryService, times(1)).discoverEndpoints();
+        verify(graphQLDiscoveryService, times(1)).discoverGraphQLEndpoints();
     }
 
     @Test
@@ -93,12 +99,14 @@ class McpToolMappingServiceTest {
         );
 
         when(discoveryService.discoverEndpoints()).thenReturn(Collections.singletonList(endpoint));
+        when(graphQLDiscoveryService.discoverGraphQLEndpoints()).thenReturn(Collections.emptyList());
 
         mappingService.getAllTools();
         mappingService.refreshTools();
 
         // After refresh, discoveryService should be called again
         verify(discoveryService, times(2)).discoverEndpoints();
+        verify(graphQLDiscoveryService, times(2)).discoverGraphQLEndpoints();
     }
 
     @Test
@@ -113,6 +121,7 @@ class McpToolMappingServiceTest {
         );
 
         when(discoveryService.discoverEndpoints()).thenReturn(Collections.singletonList(endpoint));
+        when(graphQLDiscoveryService.discoverGraphQLEndpoints()).thenReturn(Collections.emptyList());
 
         List<McpTool> tools = mappingService.getAllTools();
         String toolName = tools.get(0).getName();
@@ -126,6 +135,7 @@ class McpToolMappingServiceTest {
     @Test
     void testFindToolByNameNotFound() {
         when(discoveryService.discoverEndpoints()).thenReturn(Collections.emptyList());
+        when(graphQLDiscoveryService.discoverGraphQLEndpoints()).thenReturn(Collections.emptyList());
 
         McpTool found = mappingService.findToolByName("nonexistent");
 

@@ -3,6 +3,7 @@ package com.shaibachar.springbootmcplib.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shaibachar.springbootmcplib.controller.McpController;
 import com.shaibachar.springbootmcplib.service.EndpointDiscoveryService;
+import com.shaibachar.springbootmcplib.service.GraphQLDiscoveryService;
 import com.shaibachar.springbootmcplib.service.McpToolExecutionService;
 import com.shaibachar.springbootmcplib.service.McpToolMappingService;
 import org.slf4j.Logger;
@@ -46,22 +47,38 @@ public class McpAutoConfiguration {
     }
 
     /**
+     * Creates the GraphQL discovery service bean.
+     *
+     * @param applicationContext the Spring application context
+     * @return the GraphQL discovery service
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public GraphQLDiscoveryService graphQLDiscoveryService(ApplicationContext applicationContext) {
+        logger.debug("Creating GraphQLDiscoveryService bean");
+        return new GraphQLDiscoveryService(applicationContext);
+    }
+
+    /**
      * Creates the MCP tool mapping service bean.
      *
      * @param discoveryService the endpoint discovery service
+     * @param graphQLDiscoveryService the GraphQL discovery service
      * @return the tool mapping service
      */
     @Bean
     @ConditionalOnMissingBean
-    public McpToolMappingService mcpToolMappingService(EndpointDiscoveryService discoveryService) {
+    public McpToolMappingService mcpToolMappingService(EndpointDiscoveryService discoveryService,
+                                                       GraphQLDiscoveryService graphQLDiscoveryService) {
         logger.debug("Creating McpToolMappingService bean");
-        return new McpToolMappingService(discoveryService);
+        return new McpToolMappingService(discoveryService, graphQLDiscoveryService);
     }
 
     /**
      * Creates the MCP tool execution service bean.
      *
      * @param discoveryService the endpoint discovery service
+     * @param graphQLDiscoveryService the GraphQL discovery service
      * @param applicationContext the Spring application context
      * @param objectMapper the Jackson object mapper
      * @return the tool execution service
@@ -69,10 +86,11 @@ public class McpAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public McpToolExecutionService mcpToolExecutionService(EndpointDiscoveryService discoveryService,
+                                                           GraphQLDiscoveryService graphQLDiscoveryService,
                                                            ApplicationContext applicationContext,
                                                            ObjectMapper objectMapper) {
         logger.debug("Creating McpToolExecutionService bean");
-        return new McpToolExecutionService(discoveryService, applicationContext, objectMapper);
+        return new McpToolExecutionService(discoveryService, graphQLDiscoveryService, applicationContext, objectMapper);
     }
 
     /**
