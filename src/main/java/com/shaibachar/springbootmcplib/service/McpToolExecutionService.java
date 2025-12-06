@@ -2,6 +2,7 @@ package com.shaibachar.springbootmcplib.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shaibachar.springbootmcplib.model.EndpointMetadata;
+import com.shaibachar.springbootmcplib.model.GraphQLEndpointMetadata;
 import com.shaibachar.springbootmcplib.model.McpToolExecutionResponse;
 import com.shaibachar.springbootmcplib.util.EndpointUtils;
 import org.slf4j.Logger;
@@ -15,7 +16,7 @@ import java.lang.reflect.Parameter;
 import java.util.*;
 
 /**
- * Service responsible for executing MCP tools by invoking the corresponding REST endpoints.
+ * Service responsible for executing MCP tools by invoking the corresponding REST or GraphQL endpoints.
  * Handles parameter mapping and method invocation.
  */
 public class McpToolExecutionService {
@@ -23,6 +24,7 @@ public class McpToolExecutionService {
     private static final Logger logger = LoggerFactory.getLogger(McpToolExecutionService.class);
 
     private final EndpointDiscoveryService discoveryService;
+    private final GraphQLDiscoveryService graphQLDiscoveryService;
     private final ApplicationContext applicationContext;
     private final ObjectMapper objectMapper;
 
@@ -30,13 +32,16 @@ public class McpToolExecutionService {
      * Constructor with dependency injection.
      *
      * @param discoveryService the endpoint discovery service
+     * @param graphQLDiscoveryService the GraphQL discovery service
      * @param applicationContext the Spring application context
      * @param objectMapper the Jackson object mapper
      */
     public McpToolExecutionService(EndpointDiscoveryService discoveryService,
+                                   GraphQLDiscoveryService graphQLDiscoveryService,
                                    ApplicationContext applicationContext,
                                    ObjectMapper objectMapper) {
         this.discoveryService = discoveryService;
+        this.graphQLDiscoveryService = graphQLDiscoveryService;
         this.applicationContext = applicationContext;
         this.objectMapper = objectMapper;
         logger.debug("McpToolExecutionService initialized");
@@ -53,7 +58,16 @@ public class McpToolExecutionService {
         logger.debug("Executing tool: {} with arguments: {}", toolName, arguments);
 
         try {
-            // Find the endpoint for this tool
+            // Check if it's a GraphQL tool
+            if (toolName.startsWith("graphql_")) {
+                GraphQLEndpointMetadata graphqlEndpoint = findGraphQLEndpointForTool(toolName);
+                if (graphqlEndpoint != null) {
+                    Object result = invokeGraphQLEndpoint(graphqlEndpoint, arguments);
+                    return createSuccessResponse(result);
+                }
+            }
+            
+            // Try REST endpoint
             EndpointMetadata endpoint = findEndpointForTool(toolName);
             if (endpoint == null) {
                 logger.error("Tool not found: {}", toolName);
@@ -68,7 +82,7 @@ public class McpToolExecutionService {
 
         } catch (Exception e) {
             logger.error("Error executing tool: " + toolName, e);
-            return createErrorResponse("Error executing tool");
+            return createErrorResponse("Error executing tool: " + e.getMessage());
         }
     }
 
@@ -90,6 +104,119 @@ public class McpToolExecutionService {
         }
 
         return null;
+    }
+
+    /**
+     * Finds the GraphQL endpoint metadata for a given tool name.
+     *
+     * @param toolName the tool name
+     * @return the GraphQL endpoint metadata or null
+     */
+    private GraphQLEndpointMetadata findGraphQLEndpointForTool(String toolName) {
+        List<GraphQLEndpointMetadata> endpoints = graphQLDiscoveryService.discoverGraphQLEndpoints();
+
+        for (GraphQLEndpointMetadata endpoint : endpoints) {
+            String generatedName = generateGraphQLToolName(endpoint);
+            if (generatedName.equals(toolName)) {
+                logger.debug("Found GraphQL endpoint for tool {}: {}", toolName, endpoint);
+                return endpoint;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Generates the tool name for a GraphQL endpoint (must match the one in McpToolMappingService).
+     *
+     * @param endpoint the GraphQL endpoint metadata
+     * @return the tool name
+     */
+    private String generateGraphQLToolName(GraphQLEndpointMetadata endpoint) {
+        String operationType = endpoint.getOperationType().name().toLowerCase();
+        String fieldName = endpoint.getFieldName()
+                .replaceAll("[^a-zA-Z0-9]", "_")
+                .replaceAll("_+", "_")
+                .replaceAll("^_|_$", "");
+        
+        return "graphql_" + operationType + "_" + fieldName;
+    }
+
+    /**
+     * Invokes the GraphQL endpoint with the given arguments.
+     *
+     * @param endpoint the GraphQL endpoint metadata
+     * @param arguments the input arguments
+     * @return the result of the invocation
+     * @throws Exception if invocation fails
+     */
+    private Object invokeGraphQLEndpoint(GraphQLEndpointMetadata endpoint, Map<String, Object> arguments) throws Exception {
+        logger.debug("Invoking GraphQL endpoint: {}", endpoint);
+
+        // Get the controller bean
+        Object controller = applicationContext.getBean(endpoint.getControllerClass());
+        Method method = endpoint.getHandlerMethod();
+
+        // Prepare method arguments
+        Object[] methodArgs = prepareGraphQLMethodArguments(endpoint, arguments);
+
+        logger.debug("Invoking GraphQL method {} with {} arguments", method.getName(), methodArgs.length);
+
+        // Invoke the method
+        return method.invoke(controller, methodArgs);
+    }
+
+    /**
+     * Prepares the method arguments for GraphQL endpoint from the input arguments map.
+     *
+     * @param endpoint the GraphQL endpoint metadata
+     * @param arguments the input arguments
+     * @return array of method arguments
+     * @throws Exception if argument preparation fails
+     */
+    private Object[] prepareGraphQLMethodArguments(GraphQLEndpointMetadata endpoint, Map<String, Object> arguments) throws Exception {
+        Parameter[] parameters = endpoint.getParameters();
+        Object[] methodArgs = new Object[parameters.length];
+
+        for (int i = 0; i < parameters.length; i++) {
+            Parameter param = parameters[i];
+
+            // Skip special GraphQL parameters
+            if (isGraphQLSpecialParameter(param)) {
+                methodArgs[i] = null;
+                continue;
+            }
+
+            String paramName = getGraphQLParameterName(param);
+            Object value = arguments != null ? arguments.get(paramName) : null;
+
+            // Convert value to parameter type
+            methodArgs[i] = convertValue(value, param.getType());
+
+            logger.debug("Prepared GraphQL argument {}: {} = {}", i, paramName, methodArgs[i]);
+        }
+
+        return methodArgs;
+    }
+
+    /**
+     * Checks if a parameter is a special GraphQL parameter.
+     *
+     * @param param the parameter
+     * @return true if it's a special parameter
+     */
+    private boolean isGraphQLSpecialParameter(Parameter param) {
+        return EndpointUtils.isGraphQLSpecialParameter(param);
+    }
+
+    /**
+     * Gets the parameter name from GraphQL annotations or reflection.
+     *
+     * @param param the parameter
+     * @return the parameter name
+     */
+    private String getGraphQLParameterName(Parameter param) {
+        return EndpointUtils.getGraphQLParameterName(param);
     }
 
     /**

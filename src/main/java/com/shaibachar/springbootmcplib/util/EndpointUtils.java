@@ -1,8 +1,11 @@
 package com.shaibachar.springbootmcplib.util;
 
 import com.shaibachar.springbootmcplib.model.EndpointMetadata;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
+import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 
 /**
@@ -10,6 +13,8 @@ import java.lang.reflect.Parameter;
  * Provides shared methods for working with REST endpoint metadata and parameters.
  */
 public final class EndpointUtils {
+
+    private static final Logger logger = LoggerFactory.getLogger(EndpointUtils.class);
 
     private EndpointUtils() {
         // Prevent instantiation
@@ -81,5 +86,52 @@ public final class EndpointUtils {
 
         // Fallback to parameter name from reflection
         return param.getName();
+    }
+
+    /**
+     * Gets the parameter name from GraphQL @Argument annotation or reflection.
+     *
+     * @param param the parameter
+     * @return the parameter name
+     */
+    @SuppressWarnings("unchecked") // Reflection-based annotation access requires unchecked cast
+    public static String getGraphQLParameterName(Parameter param) {
+        try {
+            // Check for @Argument annotation
+            Class<?> argumentClass = Class.forName("org.springframework.graphql.data.method.annotation.Argument");
+            Object argumentAnnotation = param.getAnnotation((Class) argumentClass);
+            if (argumentAnnotation != null) {
+                Method nameMethod = argumentClass.getMethod("name");
+                String name = (String) nameMethod.invoke(argumentAnnotation);
+                if (name != null && !name.isEmpty()) {
+                    return name;
+                }
+                
+                Method valueMethod = argumentClass.getMethod("value");
+                String value = (String) valueMethod.invoke(argumentAnnotation);
+                if (value != null && !value.isEmpty()) {
+                    return value;
+                }
+            }
+        } catch (Exception e) {
+            logger.debug("Could not extract parameter name from @Argument annotation");
+        }
+
+        // Fallback to parameter name from reflection
+        return param.getName();
+    }
+
+    /**
+     * Checks if a parameter is a special GraphQL parameter.
+     *
+     * @param param the parameter
+     * @return true if it's a special parameter
+     */
+    public static boolean isGraphQLSpecialParameter(Parameter param) {
+        Class<?> type = param.getType();
+        String typeName = type.getName();
+
+        return typeName.startsWith("graphql.schema.DataFetchingEnvironment") ||
+               typeName.startsWith("org.springframework.graphql.data.method.annotation.support");
     }
 }
