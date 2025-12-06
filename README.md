@@ -1,4 +1,4 @@
-# Spring Boot MCP Library
+# Spring Boot MCP Gateway Library
 
 A Spring Boot library that automatically exposes REST and GraphQL endpoints as MCP (Model Context Protocol) tools, enabling LLM engines to discover and execute your API endpoints dynamically.
 
