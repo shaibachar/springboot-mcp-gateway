@@ -1,19 +1,20 @@
 # Spring Boot MCP Library
 
-A Spring Boot library that automatically exposes REST endpoints as MCP (Model Context Protocol) tools, enabling LLM engines to discover and execute your API endpoints dynamically.
+A Spring Boot library that automatically exposes REST and GraphQL endpoints as MCP (Model Context Protocol) tools, enabling LLM engines to discover and execute your API endpoints dynamically.
 
 ## Features
 
-- 🔍 **Automatic Endpoint Discovery**: Scans and discovers all REST controllers in your Spring Boot application
-- 🛠️ **MCP Tool Generation**: Automatically converts REST endpoints to MCP tool definitions with JSON schemas
+- 🔍 **Automatic Endpoint Discovery**: Scans and discovers all REST and GraphQL endpoints in your Spring Boot application
+- 🛠️ **MCP Tool Generation**: Automatically converts REST and GraphQL endpoints to MCP tool definitions with JSON schemas
 - 🚀 **Runtime Execution**: Execute any discovered endpoint through MCP interface
+- 📊 **GraphQL Support**: Full support for GraphQL queries and mutations
 - 📝 **Full Documentation**: Comprehensive Javadoc for all public APIs
 - 🐛 **Debug Logging**: Detailed DEBUG-level logging for troubleshooting
 - ✅ **Tested**: Includes unit tests and integration tests
 
 ## What is MCP?
 
-The Model Context Protocol (MCP) is a standardized way to expose tools and resources that Large Language Models (LLMs) can interact with. This library implements MCP for Spring Boot REST endpoints, allowing LLMs to:
+The Model Context Protocol (MCP) is a standardized way to expose tools and resources that Large Language Models (LLMs) can interact with. This library implements MCP for Spring Boot REST and GraphQL endpoints, allowing LLMs to:
 - Discover available API endpoints as tools
 - Understand endpoint parameters through JSON schemas
 - Execute endpoints with proper parameter mapping
@@ -44,9 +45,9 @@ implementation 'com.shaibachar:spring-boot-mcp-lib:1.0.0-SNAPSHOT'
 
 1. Add the dependency to your Spring Boot project
 2. The library auto-configures itself - no additional configuration needed!
-3. Your REST endpoints are automatically exposed as MCP tools
+3. Your REST and GraphQL endpoints are automatically exposed as MCP tools
 
-### Example Application
+### REST Example
 
 ```java
 @SpringBootApplication
@@ -72,6 +73,36 @@ public class UserController {
 }
 ```
 
+### GraphQL Example
+
+```java
+@Controller
+public class UserGraphQLController {
+    
+    @QueryMapping
+    public User getUserById(@Argument Long id) {
+        return userService.getUserById(id).orElse(null);
+    }
+    
+    @MutationMapping
+    public User createUser(@Argument String name, @Argument String email) {
+        User user = new User();
+        user.setName(name);
+        user.setEmail(email);
+        return userService.createUser(user);
+    }
+}
+```
+
+To enable GraphQL support, add the Spring for GraphQL dependency:
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-graphql</artifactId>
+</dependency>
+```
+
 ### MCP Endpoints
 
 Once the library is added, the following MCP endpoints are automatically available:
@@ -82,7 +113,7 @@ Once the library is added, the following MCP endpoints are automatically availab
 GET /mcp/tools
 ```
 
-Returns all discovered REST endpoints as MCP tools with their schemas.
+Returns all discovered REST and GraphQL endpoints as MCP tools with their schemas.
 
 **Response Example:**
 ```json
@@ -99,6 +130,18 @@ Returns all discovered REST endpoints as MCP tools with their schemas.
           }
         },
         "required": ["id"]
+      }
+    },
+    {
+      "name": "graphql_query_getUserById",
+      "description": "Calls GraphQL QUERY 'getUserById' (Controller: UserGraphQLController, Method: getUserById)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          }
+        }
       }
     }
   ]
@@ -170,9 +213,11 @@ To ensure parameter names are preserved in compiled code (important for proper p
 
 ## How It Works
 
-1. **Endpoint Discovery**: On application startup, the library scans Spring's `RequestMappingHandlerMapping` to discover all registered REST endpoints
+1. **Endpoint Discovery**: On application startup, the library scans:
+   - Spring's `RequestMappingHandlerMapping` to discover all registered REST endpoints
+   - Spring GraphQL controllers to discover all GraphQL queries and mutations
 2. **Tool Generation**: Each endpoint is converted to an MCP tool with:
-   - A unique name based on HTTP method, path, and handler method name
+   - A unique name based on HTTP method/GraphQL operation type, path/field name, and handler method name
    - A description of what the endpoint does
    - A JSON schema describing the input parameters
 3. **Runtime Execution**: When a tool is executed:
@@ -224,10 +269,12 @@ To ensure parameter names are preserved in compiled code (important for proper p
 - `McpToolExecutionRequest`: Request to execute a tool
 - `McpToolExecutionResponse`: Response from tool execution
 - `EndpointMetadata`: Internal representation of a REST endpoint
+- `GraphQLEndpointMetadata`: Internal representation of a GraphQL endpoint
 
 ### Services
 
 - `EndpointDiscoveryService`: Discovers REST endpoints from Spring MVC
+- `GraphQLDiscoveryService`: Discovers GraphQL queries and mutations
 - `McpToolMappingService`: Maps endpoints to MCP tools
 - `McpToolExecutionService`: Executes tools by invoking endpoints
 
