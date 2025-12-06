@@ -144,10 +144,12 @@ class McpEnhancedFeaturesTest {
 
         // Verify values
         // Note: graphqlType contains the Java simple type name, not the GraphQL schema type
+        // TODO: Future enhancement - parse GraphQL schema to get actual GraphQL type (e.g., "String!")
         assertEquals("String", nameArg.get("graphqlType"), "GraphQL type should be String");
         assertEquals("java.lang.String", nameArg.get("javaType"), "Java type should be java.lang.String");
         // Note: Current implementation marks all GraphQL arguments as nullable=true
         // This is a known limitation where the library doesn't parse the GraphQL schema for nullability
+        // TODO: Future enhancement - parse GraphQL schema to determine actual nullability
         assertEquals(true, nameArg.get("nullable"), "GraphQL arguments are marked as nullable");
     }
 
@@ -179,6 +181,7 @@ class McpEnhancedFeaturesTest {
         
         // Note: Current implementation marks all GraphQL arguments as nullable=true
         // This is a known limitation where required status from GraphQL schema is not detected
+        // TODO: Future enhancement - implement GraphQL schema parsing to detect required vs optional fields
         assertEquals(true, idArg.get("nullable"), "Current implementation marks all args as nullable");
 
         // Verify other arguments also have the nullable field
@@ -384,7 +387,7 @@ class McpEnhancedFeaturesTest {
                 .filter(tool -> tool.getName().contains("createUser") 
                         && tool.getName().startsWith("graphql_mutation_"))
                 .findFirst()
-                .orElseThrow();
+                .orElseThrow(() -> new AssertionError("createUser GraphQL mutation not found"));
 
         // Verify enriched metadata
         Map<String, Object> properties = (Map<String, Object>) createUserTool.getInputSchema().get("properties");
