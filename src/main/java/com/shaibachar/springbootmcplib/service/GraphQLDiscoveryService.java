@@ -99,6 +99,7 @@ public class GraphQLDiscoveryService {
      * @param controllerClass the controller class
      * @param endpoints the list to add discovered endpoints to
      */
+    @SuppressWarnings("unchecked") // Reflection-based annotation access requires unchecked cast
     private void discoverGraphQLMethodsInController(Class<?> controllerClass, 
                                                      List<GraphQLEndpointMetadata> endpoints) {
         try {

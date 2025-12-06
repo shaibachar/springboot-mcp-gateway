@@ -227,12 +227,7 @@ public class McpToolMappingService {
      * @return true if it's a special parameter
      */
     private boolean isGraphQLSpecialParameter(Parameter param) {
-        Class<?> type = param.getType();
-        String typeName = type.getName();
-
-        // Skip GraphQL-specific types
-        return typeName.startsWith("graphql.schema.DataFetchingEnvironment") ||
-               typeName.startsWith("org.springframework.graphql.data.method.annotation.support");
+        return EndpointUtils.isGraphQLSpecialParameter(param);
     }
 
     /**
@@ -242,29 +237,7 @@ public class McpToolMappingService {
      * @return the parameter name
      */
     private String getGraphQLParameterName(Parameter param) {
-        try {
-            // Check for @Argument annotation
-            Class<?> argumentClass = Class.forName("org.springframework.graphql.data.method.annotation.Argument");
-            Object argumentAnnotation = param.getAnnotation((Class) argumentClass);
-            if (argumentAnnotation != null) {
-                Method nameMethod = argumentClass.getMethod("name");
-                String name = (String) nameMethod.invoke(argumentAnnotation);
-                if (name != null && !name.isEmpty()) {
-                    return name;
-                }
-                
-                Method valueMethod = argumentClass.getMethod("value");
-                String value = (String) valueMethod.invoke(argumentAnnotation);
-                if (value != null && !value.isEmpty()) {
-                    return value;
-                }
-            }
-        } catch (Exception e) {
-            logger.debug("Could not extract parameter name from @Argument annotation");
-        }
-
-        // Fallback to parameter name from reflection
-        return param.getName();
+        return EndpointUtils.getGraphQLParameterName(param);
     }
 
     /**

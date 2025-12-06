@@ -138,8 +138,8 @@ class GraphQLMcpIntegrationTest {
         
         // Extract user ID from response - the response is a ResponseEntity, so we need to extract the body
         String userJson = createResponse.getContent().get(0).getText();
-        Map responseMap = objectMapper.readValue(userJson, Map.class);
-        Map userMap = (Map) responseMap.get("body");
+        Map<String, Object> responseMap = objectMapper.readValue(userJson, Map.class);
+        Map<String, Object> userMap = (Map<String, Object>) responseMap.get("body");
         Object userId = userMap.get("id");
 
         // Now use GraphQL query to get the user by ID
