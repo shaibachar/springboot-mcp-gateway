@@ -74,7 +74,7 @@ public class McpController {
 
         try {
             if (request.getName() == null || request.getName().isEmpty()) {
-                logger.error("Tool name is required");
+                logger.warn("Tool name is required");
                 McpToolExecutionResponse errorResponse = createErrorResponse("Tool name is required");
                 return ResponseEntity.badRequest().body(errorResponse);
             }
