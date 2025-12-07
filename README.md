@@ -338,6 +338,20 @@ To ensure parameter names are preserved in compiled code (important for proper p
         └────────────────────┘
 ```
 
+## Specifications
+
+Detailed specifications live in the [`spec`](spec/README.md) directory and map directly to the implemented behaviors:
+
+- [Design overview](spec/design.md)
+- [Structured error contract](spec/feature_structured_errors.md)
+- [Discovery caching rules](spec/feature_discovery_caching.md)
+- [GraphQL metadata requirements](spec/feature_graphql_metadata.md)
+- [Parallel execution principles](spec/parallel.md)
+- [Parallel implementation details](spec/implementation_parallel.md)
+- [Performance expectations](spec/performance.md)
+- [Risk mitigations](spec/risks.md)
+- [Testing checklist](spec/testing.md)
+
 ## API Reference
 
 ### Models
