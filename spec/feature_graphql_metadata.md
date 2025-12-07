@@ -1,14 +1,14 @@
-# Feature: Enriched GraphQL Tool Metadata
+# Enriched GraphQL Tool Metadata
 
-## Overview
-GraphQL tools now advertise richer argument metadata to help clients construct accurate payloads without guessing types or nullability.
+## Purpose
+Expose argument shapes clearly so clients can build valid payloads without guessing types or nullability.
 
-## Key Changes
-- Each GraphQL argument schema now includes `graphqlType`, `javaType`, and `nullable` flags alongside the existing JSON schema `type`.
-- Required detection continues to use GraphQL annotations; `nullable` is derived as the inverse of required.
-- REST schemas also expose `javaType` for parity.
+## Contract
+- Each GraphQL argument schema includes `graphqlType`, `javaType`, `nullable`, and existing JSON schema `type`.
+- Required detection reuses GraphQL annotations; `nullable` is the inverse of required.
+- REST parameters also expose `javaType` for parity.
 
-## Acceptance Criteria
-- `/mcp/tools` responses for GraphQL tools list `graphqlType` and `javaType` inside argument schemas.
-- Required GraphQL arguments show `nullable=false`; optional arguments show `nullable=true`.
-- REST parameters expose `javaType` without altering prior schema type hints.
+## Acceptance criteria
+- `/mcp/tools` responses for GraphQL tools list `graphqlType` and `javaType` per argument.
+- Required arguments show `nullable=false`; optional ones show `nullable=true`.
+- REST parameters surface `javaType` while keeping previous schema hints intact.

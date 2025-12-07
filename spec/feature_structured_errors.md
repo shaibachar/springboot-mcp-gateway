@@ -1,15 +1,15 @@
-# Feature: Structured Error Payloads
+# Structured Error Payloads
 
-## Overview
-MCP tool executions now emit stable error codes, correlation IDs, and optional structured details alongside the legacy `content` list. This improves debuggability for clients and operators.
+## Purpose
+Give clients stable error codes, correlation IDs, and optional structured details while keeping legacy `content` intact.
 
-## Key Changes
-- `McpToolExecutionResponse` adds `errorCode`, `requestId`, and `details` fields.
-- `McpController` generates a UUID per request and returns it in success and error responses.
-- Validation issues surface `validation_error` codes with Spring `BindingResult` objects in `details`.
-- Execution failures map to `tool_not_found`, `execution_error`, or `serialization_error` codes.
+## Contract
+- Response fields: `requestId` (always), `errorCode` (on errors), `details` (optional object).
+- Error codes: `validation_error`, `tool_not_found`, `execution_error`, `serialization_error`, `internal_error`.
+- Controllers issue a UUID `requestId` and echo it on both success and failure.
+- Validation errors surface Spring binding results inside `details`.
 
-## Acceptance Criteria
-- When `name` is blank, `/mcp/tools/execute` returns HTTP 400 with `errorCode=validation_error` and a non-empty `requestId`.
-- When a tool name does not resolve, the response includes `errorCode=tool_not_found`.
-- Successful executions include the same `requestId` echoed from the controller.
+## Acceptance criteria
+- Blank `name` on `/mcp/tools/execute` → HTTP 400, `errorCode=validation_error`, non-empty `requestId`.
+- Unknown tool name → `errorCode=tool_not_found` with the request ID.
+- Successful executions echo the same controller-generated `requestId`.
