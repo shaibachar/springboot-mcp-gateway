@@ -7,3 +7,5 @@ Use these specs to understand the MCP gateway at a glance. Each file keeps the f
 - `feature_discovery_caching.md`: Discovery cache rules and refresh expectations.
 - `feature_graphql_metadata.md`: Required metadata for GraphQL and REST tool schemas.
 - `testing.md`: Minimal checks to verify the contract.
+- `risks.md`: Key delivery and operational risks with mitigations.
+- `performance.md`: Latency, memory, and caching expectations.

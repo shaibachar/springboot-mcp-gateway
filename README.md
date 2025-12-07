@@ -19,6 +19,11 @@ The Model Context Protocol (MCP) is a standardized way to expose tools and resou
 - Understand endpoint parameters through JSON schemas
 - Execute endpoints with proper parameter mapping
 
+## Building and testing
+
+- Run the library tests with `mvn test` from the repository root.
+- Maven must reach Maven Central to download the Spring Boot BOM and related dependencies. If you see `403 Forbidden` errors, remove or update any proxy configuration in `~/.m2/settings.xml` and retry with network access enabled.
+
 ## Installation
 
 ### Maven
