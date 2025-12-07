@@ -31,6 +31,10 @@ class McpIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    private McpToolExecutionResponse readResponse(MvcResult result) throws Exception {
+        return objectMapper.readValue(result.getResponse().getContentAsString(), McpToolExecutionResponse.class);
+    }
+
     @Test
     void testListToolsEndpoint() throws Exception {
         MvcResult result = mockMvc.perform(get("/mcp/tools"))
@@ -38,13 +42,14 @@ class McpIntegrationTest {
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andReturn();
 
-        String content = result.getResponse().getContentAsString();
-        McpToolExecutionResponse executionResponse = objectMapper.readValue(content, McpToolExecutionResponse.class);
+        McpToolExecutionResponse executionResponse = readResponse(result);
 
         assertNotNull(executionResponse);
         assertFalse(executionResponse.getIsError());
         assertNotNull(executionResponse.getContent());
-        
+        assertNotNull(executionResponse.getRequestId());
+        assertFalse(executionResponse.getRequestId().isBlank());
+
         // Extract McpToolsResponse from the content
         String toolsJson = executionResponse.getContent().get(0).getText();
         McpToolsResponse response = objectMapper.readValue(toolsJson, McpToolsResponse.class);
@@ -66,8 +71,7 @@ class McpIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        String listContent = listResult.getResponse().getContentAsString();
-        McpToolExecutionResponse executionResponse = objectMapper.readValue(listContent, McpToolExecutionResponse.class);
+        McpToolExecutionResponse executionResponse = readResponse(listResult);
         String toolsJson = executionResponse.getContent().get(0).getText();
         McpToolsResponse toolsResponse = objectMapper.readValue(toolsJson, McpToolsResponse.class);
 
@@ -89,8 +93,7 @@ class McpIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        String execContent = execResult.getResponse().getContentAsString();
-        McpToolExecutionResponse response = objectMapper.readValue(execContent, McpToolExecutionResponse.class);
+        McpToolExecutionResponse response = readResponse(execResult);
 
         assertNotNull(response);
         assertFalse(response.getIsError());
@@ -106,8 +109,7 @@ class McpIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        String listContent = listResult.getResponse().getContentAsString();
-        McpToolExecutionResponse executionResponse = objectMapper.readValue(listContent, McpToolExecutionResponse.class);
+        McpToolExecutionResponse executionResponse = readResponse(listResult);
         String toolsJson = executionResponse.getContent().get(0).getText();
         McpToolsResponse toolsResponse = objectMapper.readValue(toolsJson, McpToolsResponse.class);
 
@@ -132,8 +134,7 @@ class McpIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        String execContent = execResult.getResponse().getContentAsString();
-        McpToolExecutionResponse response = objectMapper.readValue(execContent, McpToolExecutionResponse.class);
+        McpToolExecutionResponse response = readResponse(execResult);
 
         assertNotNull(response);
         assertFalse(response.getIsError());
@@ -148,8 +149,7 @@ class McpIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        String listContent = listResult.getResponse().getContentAsString();
-        McpToolExecutionResponse executionResponse = objectMapper.readValue(listContent, McpToolExecutionResponse.class);
+        McpToolExecutionResponse executionResponse = readResponse(listResult);
         String toolsJson = executionResponse.getContent().get(0).getText();
         McpToolsResponse toolsResponse = objectMapper.readValue(toolsJson, McpToolsResponse.class);
 
@@ -174,8 +174,7 @@ class McpIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        String execContent = execResult.getResponse().getContentAsString();
-        McpToolExecutionResponse response = objectMapper.readValue(execContent, McpToolExecutionResponse.class);
+        McpToolExecutionResponse response = readResponse(execResult);
 
         assertNotNull(response);
         assertFalse(response.getIsError());
@@ -195,17 +194,70 @@ class McpIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andReturn();
 
-        String content = result.getResponse().getContentAsString();
-        McpToolExecutionResponse response = objectMapper.readValue(content, McpToolExecutionResponse.class);
+        McpToolExecutionResponse response = readResponse(result);
 
         assertNotNull(response);
         assertTrue(response.getIsError());
+        assertEquals("tool_not_found", response.getErrorCode());
+        assertNotNull(response.getRequestId());
+        assertFalse(response.getRequestId().isBlank());
+        assertNotNull(response.getContent());
+        assertTrue(response.getContent().get(0).getText().contains("nonexistent_tool"));
     }
 
     @Test
     void testRefreshToolsEndpoint() throws Exception {
-        mockMvc.perform(post("/mcp/tools/refresh"))
+        MvcResult result = mockMvc.perform(post("/mcp/tools/refresh"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("refreshed")));
+                .andReturn();
+
+        McpToolExecutionResponse response = readResponse(result);
+
+        assertNotNull(response.getRequestId());
+        assertFalse(response.getRequestId().isBlank());
+        assertFalse(response.getIsError());
+        assertNull(response.getErrorCode());
+        assertNotNull(response.getContent());
+        assertTrue(response.getContent().get(0).getText().contains("refreshed"));
+    }
+
+    @Test
+    void testListToolsEnvelopeIncludesRequestId() throws Exception {
+        MvcResult result = mockMvc.perform(get("/mcp/tools"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        McpToolExecutionResponse response = readResponse(result);
+
+        assertNotNull(response.getRequestId());
+        assertFalse(response.getRequestId().isBlank());
+        assertFalse(response.getIsError());
+        assertNull(response.getErrorCode());
+    }
+
+    @Test
+    void testExecuteToolValidationErrorIncludesDetails() throws Exception {
+        McpToolExecutionRequest request = new McpToolExecutionRequest("", new HashMap<>());
+
+        MvcResult result = mockMvc.perform(post("/mcp/tools/execute")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+
+        McpToolExecutionResponse response = readResponse(result);
+
+        assertTrue(response.getIsError());
+        assertEquals("validation_error", response.getErrorCode());
+        assertNotNull(response.getRequestId());
+        assertFalse(response.getRequestId().isBlank());
+        assertNotNull(response.getDetails());
+        assertTrue(response.getDetails() instanceof Iterable<?>);
+        Iterable<?> details = (Iterable<?>) response.getDetails();
+        Object firstDetail = details.iterator().hasNext() ? details.iterator().next() : null;
+        assertNotNull(firstDetail);
+        assertTrue(firstDetail.toString().contains("name"));
+        assertNotNull(response.getContent());
+        assertTrue(response.getContent().get(0).getText().contains("Tool name is required"));
     }
 }
