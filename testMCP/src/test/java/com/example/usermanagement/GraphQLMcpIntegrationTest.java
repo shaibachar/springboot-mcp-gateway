@@ -138,7 +138,9 @@ class GraphQLMcpIntegrationTest {
         
         // Extract user ID from response - the response is a ResponseEntity, so we need to extract the body
         String userJson = createResponse.getContent().get(0).getText();
+        @SuppressWarnings("unchecked")
         Map<String, Object> responseMap = objectMapper.readValue(userJson, Map.class);
+        @SuppressWarnings("unchecked")
         Map<String, Object> userMap = (Map<String, Object>) responseMap.get("body");
         Object userId = userMap.get("id");
 
@@ -277,10 +279,12 @@ class GraphQLMcpIntegrationTest {
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("No GraphQL tool with parameters found"));
 
+        @SuppressWarnings("unchecked")
         Map<String, Object> properties = (Map<String, Object>) graphqlTool.getInputSchema().get("properties");
 
         // Verify each parameter has enhanced metadata
         for (Map.Entry<String, Object> entry : properties.entrySet()) {
+            @SuppressWarnings("unchecked")
             Map<String, Object> paramSchema = (Map<String, Object>) entry.getValue();
 
             // Verify graphqlType is present

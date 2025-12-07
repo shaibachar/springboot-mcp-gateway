@@ -5,7 +5,6 @@ import com.shaibachar.springbootmcplib.model.McpTool;
 import com.shaibachar.springbootmcplib.model.McpToolExecutionRequest;
 import com.shaibachar.springbootmcplib.model.McpToolExecutionResponse;
 import com.shaibachar.springbootmcplib.model.McpToolsResponse;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -131,10 +130,12 @@ class McpEnhancedFeaturesTest {
 
         // Verify input schema has enriched metadata
         assertNotNull(createUserTool.getInputSchema());
+        @SuppressWarnings("unchecked")
         Map<String, Object> properties = (Map<String, Object>) createUserTool.getInputSchema().get("properties");
         assertNotNull(properties, "Properties should exist in input schema");
 
         // Check 'name' argument has enriched metadata
+        @SuppressWarnings("unchecked")
         Map<String, Object> nameArg = (Map<String, Object>) properties.get("name");
         assertNotNull(nameArg, "name argument should exist");
         
@@ -180,10 +181,12 @@ class McpEnhancedFeaturesTest {
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("updateUser GraphQL mutation not found"));
 
+        @SuppressWarnings("unchecked")
         Map<String, Object> properties = (Map<String, Object>) updateUserTool.getInputSchema().get("properties");
         assertNotNull(properties);
 
         // Verify all arguments have nullable field
+        @SuppressWarnings("unchecked")
         Map<String, Object> idArg = (Map<String, Object>) properties.get("id");
         assertNotNull(idArg);
         assertTrue(idArg.containsKey("nullable"), "Should have nullable field");
@@ -201,6 +204,7 @@ class McpEnhancedFeaturesTest {
         assertEquals(true, idArg.get("nullable"), "Current implementation marks all args as nullable");
 
         // Verify other arguments also have the nullable field
+        @SuppressWarnings("unchecked")
         Map<String, Object> nameArg = (Map<String, Object>) properties.get("name");
         if (nameArg != null) {
             assertTrue(nameArg.containsKey("nullable"), "Should have nullable field");
@@ -227,9 +231,11 @@ class McpEnhancedFeaturesTest {
                 .orElseThrow(() -> new AssertionError("getUserById REST tool not found"));
 
         // Verify input schema has javaType for parameters
+        @SuppressWarnings("unchecked")
         Map<String, Object> properties = (Map<String, Object>) getUserByIdTool.getInputSchema().get("properties");
         assertNotNull(properties, "Properties should exist");
 
+        @SuppressWarnings("unchecked")
         Map<String, Object> idParam = (Map<String, Object>) properties.get("id");
         assertNotNull(idParam, "id parameter should exist");
         assertTrue(idParam.containsKey("javaType"), "REST parameter should contain javaType");
@@ -406,7 +412,9 @@ class McpEnhancedFeaturesTest {
                 .orElseThrow(() -> new AssertionError("createUser GraphQL mutation not found"));
 
         // Verify enriched metadata
+        @SuppressWarnings("unchecked")
         Map<String, Object> properties = (Map<String, Object>) createUserTool.getInputSchema().get("properties");
+        @SuppressWarnings("unchecked")
         Map<String, Object> nameArg = (Map<String, Object>) properties.get("name");
         assertTrue(nameArg.containsKey("graphqlType"));
         assertTrue(nameArg.containsKey("javaType"));
