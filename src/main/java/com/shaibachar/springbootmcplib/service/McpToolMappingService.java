@@ -6,10 +6,8 @@ import com.shaibachar.springbootmcplib.model.McpTool;
 import com.shaibachar.springbootmcplib.util.EndpointUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.*;
 
-import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.*;
 
@@ -217,10 +215,8 @@ public class McpToolMappingService {
             }
 
             String paramName = getGraphQLParameterName(param);
-            Map<String, Object> paramSchema = generateParameterSchema(param);
-            paramSchema.put("nullable", !isGraphQLRequiredParameter(param));
-            paramSchema.put("graphqlType", param.getType().getSimpleName());
-
+            Map<String, Object> paramSchema = generateGraphQLParameterSchema(param);
+            
             properties.put(paramName, paramSchema);
 
             // Check if parameter is required (not annotated with @Argument with required=false)
@@ -265,11 +261,13 @@ public class McpToolMappingService {
      * @param param the parameter
      * @return true if required
      */
+    @SuppressWarnings("unchecked") // Reflection-based annotation access requires unchecked cast
     private boolean isGraphQLRequiredParameter(Parameter param) {
         try {
             // Check @Argument required attribute
             Class<?> argumentClass = Class.forName("org.springframework.graphql.data.method.annotation.Argument");
-            Object argumentAnnotation = param.getAnnotation((Class) argumentClass);
+            Class<? extends java.lang.annotation.Annotation> annotationClass = (Class<? extends java.lang.annotation.Annotation>) argumentClass;
+            Object argumentAnnotation = param.getAnnotation(annotationClass);
             if (argumentAnnotation != null) {
                 // GraphQL arguments are optional by default in Spring for GraphQL
                 return false;
@@ -385,7 +383,47 @@ public class McpToolMappingService {
             schema.put("type", "object");
         }
 
+        // Add javaType for all parameters
         schema.put("javaType", type.getName());
+        
+        // Add nullable field (inverse of required)
+        schema.put("nullable", !isRequiredParameter(param));
+
+        return schema;
+    }
+
+    /**
+     * Generates schema for a single GraphQL parameter.
+     *
+     * @param param the parameter
+     * @return the parameter schema
+     */
+    private Map<String, Object> generateGraphQLParameterSchema(Parameter param) {
+        Map<String, Object> schema = new HashMap<>();
+        Class<?> type = param.getType();
+
+        // Map Java types to JSON schema types
+        if (type == String.class) {
+            schema.put("type", "string");
+        } else if (type == Integer.class || type == int.class ||
+                   type == Long.class || type == long.class) {
+            schema.put("type", "integer");
+        } else if (type == Double.class || type == double.class ||
+                   type == Float.class || type == float.class) {
+            schema.put("type", "number");
+        } else if (type == Boolean.class || type == boolean.class) {
+            schema.put("type", "boolean");
+        } else if (type.isArray() || Collection.class.isAssignableFrom(type)) {
+            schema.put("type", "array");
+        } else {
+            // For complex objects, use object type
+            schema.put("type", "object");
+        }
+
+        // Add GraphQL-specific metadata
+        schema.put("graphqlType", type.getSimpleName());
+        schema.put("javaType", type.getName());
+        schema.put("nullable", !isGraphQLRequiredParameter(param));
 
         return schema;
     }

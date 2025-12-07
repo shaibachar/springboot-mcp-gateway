@@ -260,4 +260,73 @@ class GraphQLMcpIntegrationTest {
         assertFalse(searchResponse.getIsError());
         assertTrue(searchResponse.getContent().get(0).getText().contains("Searchable User"));
     }
+
+    @Test
+    void testGraphQLToolMetadata_EnhancedFields() throws Exception {
+        MvcResult result = mockMvc.perform(get("/mcp/tools"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String content = result.getResponse().getContentAsString();
+        McpToolsResponse response = objectMapper.readValue(content, McpToolsResponse.class);
+
+        // Find a GraphQL tool with arguments
+        var graphqlTool = response.getTools().stream()
+                .filter(tool -> tool.getName().startsWith("graphql_"))
+                .filter(tool -> tool.getInputSchema().get("properties") != null)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("No GraphQL tool with parameters found"));
+
+        Map<String, Object> properties = (Map<String, Object>) graphqlTool.getInputSchema().get("properties");
+
+        // Verify each parameter has enhanced metadata
+        for (Map.Entry<String, Object> entry : properties.entrySet()) {
+            Map<String, Object> paramSchema = (Map<String, Object>) entry.getValue();
+
+            // Verify graphqlType is present
+            assertTrue(paramSchema.containsKey("graphqlType"),
+                    "GraphQL parameter " + entry.getKey() + " should have graphqlType");
+            assertNotNull(paramSchema.get("graphqlType"));
+
+            // Verify javaType is present
+            assertTrue(paramSchema.containsKey("javaType"),
+                    "GraphQL parameter " + entry.getKey() + " should have javaType");
+            assertNotNull(paramSchema.get("javaType"));
+
+            // Verify nullable is present
+            assertTrue(paramSchema.containsKey("nullable"),
+                    "GraphQL parameter " + entry.getKey() + " should have nullable field");
+        }
+    }
+
+    @Test
+    void testExecutionResponse_IncludesRequestId() throws Exception {
+        MvcResult listResult = mockMvc.perform(get("/mcp/tools"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String listContent = listResult.getResponse().getContentAsString();
+        McpToolsResponse toolsResponse = objectMapper.readValue(listContent, McpToolsResponse.class);
+
+        String toolName = toolsResponse.getTools().stream()
+                .filter(tool -> tool.getName().contains("getAllUsers"))
+                .map(tool -> tool.getName())
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("getAllUsers tool not found"));
+
+        McpToolExecutionRequest request = new McpToolExecutionRequest(toolName, new HashMap<>());
+
+        MvcResult execResult = mockMvc.perform(post("/mcp/tools/execute")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String execContent = execResult.getResponse().getContentAsString();
+        McpToolExecutionResponse response = objectMapper.readValue(execContent, McpToolExecutionResponse.class);
+
+        // Verify requestId is present in successful response
+        assertNotNull(response.getRequestId(), "Response should include requestId");
+        assertFalse(response.getRequestId().isEmpty(), "RequestId should not be empty");
+    }
 }

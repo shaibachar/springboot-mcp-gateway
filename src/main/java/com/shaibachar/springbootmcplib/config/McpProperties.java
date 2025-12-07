@@ -13,10 +13,20 @@ public class McpProperties {
      */
     private Cache cache = new Cache();
 
+    /**
+     * Gets the cache configuration.
+     *
+     * @return the cache configuration
+     */
     public Cache getCache() {
         return cache;
     }
 
+    /**
+     * Sets the cache configuration.
+     *
+     * @param cache the cache configuration
+     */
     public void setCache(Cache cache) {
         this.cache = cache;
     }
@@ -31,10 +41,20 @@ public class McpProperties {
          */
         private long ttlMillis = 5 * 60 * 1000;
 
+        /**
+         * Gets the cache TTL in milliseconds.
+         *
+         * @return the TTL in milliseconds
+         */
         public long getTtlMillis() {
             return ttlMillis;
         }
 
+        /**
+         * Sets the cache TTL in milliseconds.
+         *
+         * @param ttlMillis the TTL in milliseconds
+         */
         public void setTtlMillis(long ttlMillis) {
             this.ttlMillis = ttlMillis;
         }

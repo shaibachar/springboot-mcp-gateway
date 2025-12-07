@@ -8,6 +8,9 @@ A Spring Boot library that automatically exposes REST and GraphQL endpoints as M
 - 🛠️ **MCP Tool Generation**: Automatically converts REST and GraphQL endpoints to MCP tool definitions with JSON schemas
 - 🚀 **Runtime Execution**: Execute any discovered endpoint through MCP interface
 - 📊 **GraphQL Support**: Full support for GraphQL queries and mutations
+- 🔒 **Structured Error Payloads**: Enhanced error responses with error codes, request IDs, and structured details
+- 📋 **Enhanced Metadata**: Rich parameter metadata including javaType, graphqlType, and nullable fields
+- ⚡ **Discovery Caching**: Per-endpoint TTL caching with configurable refresh for optimal performance
 - 📝 **Full Documentation**: Comprehensive Javadoc for all public APIs
 - 🐛 **Debug Logging**: Detailed DEBUG-level logging for troubleshooting
 - ✅ **Tested**: Includes unit tests and integration tests
@@ -131,7 +134,9 @@ Returns all discovered REST and GraphQL endpoints as MCP tools with their schema
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "javaType": "java.lang.String",
+            "nullable": false
           }
         },
         "required": ["id"]
@@ -144,7 +149,10 @@ Returns all discovered REST and GraphQL endpoints as MCP tools with their schema
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "graphqlType": "Long",
+            "javaType": "java.lang.Long",
+            "nullable": true
           }
         }
       }
@@ -176,9 +184,33 @@ Content-Type: application/json
       "text": "{\"id\":\"123\",\"name\":\"John Doe\"}"
     }
   ],
-  "isError": false
+  "isError": false,
+  "requestId": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
+
+**Error Response Example:**
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Tool not found: invalid_tool_name"
+    }
+  ],
+  "isError": true,
+  "errorCode": "tool_not_found",
+  "requestId": "550e8400-e29b-41d4-a716-446655440001",
+  "details": null
+}
+```
+
+**Error Codes:**
+- `validation_error`: Invalid request parameters
+- `tool_not_found`: Requested tool does not exist
+- `execution_error`: Error during tool execution
+- `serialization_error`: Error serializing the result
+- `internal_error`: Internal server error
 
 #### Refresh Tools Cache
 
@@ -189,6 +221,23 @@ POST /mcp/tools/refresh
 Forces a refresh of the discovered endpoints (useful if controllers are dynamically registered).
 
 ## Configuration
+
+### Cache Configuration
+
+Configure the discovery cache TTL in `application.properties`:
+
+```properties
+# Cache TTL in milliseconds (default: 300000 = 5 minutes)
+mcp.cache.ttl-millis=600000
+```
+
+Or in `application.yml`:
+
+```yaml
+mcp:
+  cache:
+    ttl-millis: 600000  # 10 minutes
+```
 
 ### Logging
 

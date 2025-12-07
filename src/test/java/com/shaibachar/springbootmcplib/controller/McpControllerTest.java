@@ -9,6 +9,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.BindingResult;
 
 import java.util.*;
 
@@ -25,6 +26,9 @@ class McpControllerTest {
 
     @Mock
     private McpToolExecutionService toolExecutionService;
+
+    @Mock
+    private BindingResult bindingResult;
 
     private McpController controller;
 
@@ -63,18 +67,21 @@ class McpControllerTest {
             new McpToolExecutionResponse.ContentItem("text", "Success");
         McpToolExecutionResponse executionResponse = 
             new McpToolExecutionResponse(Collections.singletonList(content), false);
+        executionResponse.setRequestId("test-request-id");
 
-        when(toolExecutionService.executeTool(anyString(), any())).thenReturn(executionResponse);
+        when(bindingResult.hasErrors()).thenReturn(false);
+        when(toolExecutionService.executeTool(anyString(), any(), anyString())).thenReturn(executionResponse);
 
         // Execute
-        ResponseEntity<McpToolExecutionResponse> response = controller.executeTool(request);
+        ResponseEntity<McpToolExecutionResponse> response = controller.executeTool(request, bindingResult);
 
         // Verify
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertFalse(response.getBody().getIsError());
+        assertNotNull(response.getBody().getRequestId());
 
-        verify(toolExecutionService, times(1)).executeTool("test_tool", new HashMap<>());
+        verify(toolExecutionService, times(1)).executeTool(eq("test_tool"), any(), anyString());
     }
 
     @Test
@@ -86,16 +93,19 @@ class McpControllerTest {
             new McpToolExecutionResponse.ContentItem("text", "Error occurred");
         McpToolExecutionResponse executionResponse = 
             new McpToolExecutionResponse(Collections.singletonList(content), true);
+        executionResponse.setRequestId("test-request-id");
 
-        when(toolExecutionService.executeTool(anyString(), any())).thenReturn(executionResponse);
+        when(bindingResult.hasErrors()).thenReturn(false);
+        when(toolExecutionService.executeTool(anyString(), any(), anyString())).thenReturn(executionResponse);
 
         // Execute
-        ResponseEntity<McpToolExecutionResponse> response = controller.executeTool(request);
+        ResponseEntity<McpToolExecutionResponse> response = controller.executeTool(request, bindingResult);
 
         // Verify
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
         assertTrue(response.getBody().getIsError());
+        assertNotNull(response.getBody().getRequestId());
     }
 
     @Test
@@ -103,15 +113,19 @@ class McpControllerTest {
         // Prepare test data
         McpToolExecutionRequest request = new McpToolExecutionRequest("", new HashMap<>());
 
+        when(bindingResult.hasErrors()).thenReturn(true);
+
         // Execute
-        ResponseEntity<McpToolExecutionResponse> response = controller.executeTool(request);
+        ResponseEntity<McpToolExecutionResponse> response = controller.executeTool(request, bindingResult);
 
         // Verify
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
         assertTrue(response.getBody().getIsError());
+        assertNotNull(response.getBody().getRequestId());
+        assertEquals("validation_error", response.getBody().getErrorCode());
 
-        verify(toolExecutionService, never()).executeTool(anyString(), any());
+        verify(toolExecutionService, never()).executeTool(anyString(), any(), anyString());
     }
 
     @Test

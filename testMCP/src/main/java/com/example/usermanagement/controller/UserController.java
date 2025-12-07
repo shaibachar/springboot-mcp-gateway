@@ -52,4 +52,35 @@ public class UserController {
         }
         return ResponseEntity.notFound().build();
     }
+
+    /**
+     * Test endpoint with optional and required parameters.
+     * Tests nullable field in parameter schemas.
+     */
+    @GetMapping("/search")
+    public ResponseEntity<List<User>> searchUsers(
+            @RequestParam String name,  // required parameter
+            @RequestParam(required = false) Integer minAge,  // optional parameter
+            @RequestParam(required = false, defaultValue = "false") Boolean activeOnly) {  // optional with default
+        
+        return ResponseEntity.ok(userService.getAllUsers().stream()
+                .filter(user -> user.getName().toLowerCase().contains(name.toLowerCase()))
+                .toList());
+    }
+
+    /**
+     * Test endpoint with various parameter types.
+     * Tests javaType metadata in parameter schemas.
+     */
+    @PostMapping("/batch")
+    public ResponseEntity<String> batchOperation(
+            @RequestParam Long userId,
+            @RequestParam Integer count,
+            @RequestParam Double amount,
+            @RequestParam Boolean verify) {
+        
+        String result = String.format("Batch operation: userId=%d, count=%d, amount=%.2f, verify=%b",
+                userId, count, amount, verify);
+        return ResponseEntity.ok(result);
+    }
 }

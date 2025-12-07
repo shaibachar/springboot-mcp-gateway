@@ -14,7 +14,10 @@ public class GraphQLEndpointMetadata {
      * The type of GraphQL operation (QUERY or MUTATION).
      */
     public enum OperationType {
-        QUERY, MUTATION
+        /** GraphQL query operation */
+        QUERY,
+        /** GraphQL mutation operation */
+        MUTATION
     }
 
     /**

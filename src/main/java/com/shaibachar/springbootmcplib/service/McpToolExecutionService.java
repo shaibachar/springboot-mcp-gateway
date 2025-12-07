@@ -8,8 +8,6 @@ import com.shaibachar.springbootmcplib.util.EndpointUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
-import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.*;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
@@ -52,6 +50,7 @@ public class McpToolExecutionService {
      *
      * @param toolName the name of the tool to execute
      * @param arguments the input arguments
+     * @param requestId the correlation ID for this request
      * @return the execution response
      */
     public McpToolExecutionResponse executeTool(String toolName, Map<String, Object> arguments, String requestId) {

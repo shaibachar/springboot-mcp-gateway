@@ -3,11 +3,11 @@ package com.shaibachar.springbootmcplib.service;
 import com.shaibachar.springbootmcplib.config.McpProperties;
 import com.shaibachar.springbootmcplib.model.CachedEndpoint;
 import com.shaibachar.springbootmcplib.model.GraphQLEndpointMetadata;
+import com.shaibachar.springbootmcplib.util.TimeProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
-import org.springframework.core.annotation.AnnotationUtils;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -25,6 +25,7 @@ public class GraphQLDiscoveryService {
 
     private final ApplicationContext applicationContext;
     private final McpProperties properties;
+    private final TimeProvider timeProvider;
     private final boolean graphqlAvailable;
     private final Map<String, CachedEndpoint<GraphQLEndpointMetadata>> cachedEndpointsMap = new ConcurrentHashMap<>();
 
@@ -33,11 +34,13 @@ public class GraphQLDiscoveryService {
      *
      * @param applicationContext the Spring application context
      * @param properties the MCP properties
+     * @param timeProvider the time provider
      */
     @Autowired
-    public GraphQLDiscoveryService(ApplicationContext applicationContext, McpProperties properties) {
+    public GraphQLDiscoveryService(ApplicationContext applicationContext, McpProperties properties, TimeProvider timeProvider) {
         this.applicationContext = applicationContext;
         this.properties = properties;
+        this.timeProvider = timeProvider;
         this.graphqlAvailable = isGraphQLAvailable();
         if (graphqlAvailable) {
             logger.debug("GraphQL support is available with TTL: {} ms", properties.getCache().getTtlMillis());
@@ -70,7 +73,7 @@ public class GraphQLDiscoveryService {
     public List<GraphQLEndpointMetadata> discoverGraphQLEndpoints() {
         logger.debug("Starting GraphQL endpoint discovery with per-endpoint TTL caching");
         long ttlMillis = properties.getCache().getTtlMillis();
-        long now = System.currentTimeMillis();
+        long now = timeProvider.getCurrentTimeMillis();
 
         if (!graphqlAvailable) {
             logger.debug("GraphQL not available, skipping discovery");
@@ -162,8 +165,9 @@ public class GraphQLDiscoveryService {
 
             for (Method method : controllerClass.getDeclaredMethods()) {
                 // Check for @QueryMapping using reflection to avoid compile-time dependency
-                if (method.isAnnotationPresent((Class) queryMappingClass)) {
-                    Object queryMapping = method.getAnnotation((Class) queryMappingClass);
+                Class<? extends java.lang.annotation.Annotation> queryAnnotationClass = (Class<? extends java.lang.annotation.Annotation>) queryMappingClass;
+                if (method.isAnnotationPresent(queryAnnotationClass)) {
+                    Object queryMapping = method.getAnnotation(queryAnnotationClass);
                     String fieldName = extractFieldName(queryMapping, method);
                     GraphQLEndpointMetadata metadata = new GraphQLEndpointMetadata(
                             fieldName,
@@ -177,8 +181,9 @@ public class GraphQLDiscoveryService {
                 }
 
                 // Check for @MutationMapping using reflection to avoid compile-time dependency
-                if (method.isAnnotationPresent((Class) mutationMappingClass)) {
-                    Object mutationMapping = method.getAnnotation((Class) mutationMappingClass);
+                Class<? extends java.lang.annotation.Annotation> mutationAnnotationClass = (Class<? extends java.lang.annotation.Annotation>) mutationMappingClass;
+                if (method.isAnnotationPresent(mutationAnnotationClass)) {
+                    Object mutationMapping = method.getAnnotation(mutationAnnotationClass);
                     String fieldName = extractFieldName(mutationMapping, method);
                     GraphQLEndpointMetadata metadata = new GraphQLEndpointMetadata(
                             fieldName,

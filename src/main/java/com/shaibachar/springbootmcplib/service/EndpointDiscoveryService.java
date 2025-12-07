@@ -3,11 +3,11 @@ package com.shaibachar.springbootmcplib.service;
 import com.shaibachar.springbootmcplib.config.McpProperties;
 import com.shaibachar.springbootmcplib.model.CachedEndpoint;
 import com.shaibachar.springbootmcplib.model.EndpointMetadata;
+import com.shaibachar.springbootmcplib.util.TimeProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
-import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
@@ -29,7 +29,7 @@ public class EndpointDiscoveryService implements ApplicationListener<ContextRefr
 
     private final RequestMappingHandlerMapping handlerMapping;
     private final McpProperties properties;
-    private boolean contextRefreshed = false;
+    private final TimeProvider timeProvider;
     private final Map<String, CachedEndpoint<EndpointMetadata>> cachedEndpointsMap = new ConcurrentHashMap<>();
 
     /**
@@ -37,16 +37,17 @@ public class EndpointDiscoveryService implements ApplicationListener<ContextRefr
      *
      * @param handlerMapping Spring's request mapping handler
      * @param properties the MCP properties
+     * @param timeProvider the time provider
      */
-    public EndpointDiscoveryService(RequestMappingHandlerMapping handlerMapping, McpProperties properties) {
+    public EndpointDiscoveryService(RequestMappingHandlerMapping handlerMapping, McpProperties properties, TimeProvider timeProvider) {
         this.handlerMapping = handlerMapping;
         this.properties = properties;
+        this.timeProvider = timeProvider;
         logger.debug("EndpointDiscoveryService initialized with TTL: {} ms", properties.getCache().getTtlMillis());
     }
 
     @Override
     public void onApplicationEvent(ContextRefreshedEvent event) {
-        contextRefreshed = true;
         logger.debug("Application context refreshed, ready to discover endpoints");
     }
 
@@ -60,13 +61,28 @@ public class EndpointDiscoveryService implements ApplicationListener<ContextRefr
     public List<EndpointMetadata> discoverEndpoints() {
         logger.debug("Starting endpoint discovery with per-endpoint TTL caching");
         long ttlMillis = properties.getCache().getTtlMillis();
-        long now = System.currentTimeMillis();
+        long now = timeProvider.getCurrentTimeMillis();
         
-        // Collect all current handler methods from Spring
+        // Collect and filter current endpoint keys from Spring handlers
         Map<RequestMappingInfo, HandlerMethod> handlerMethods = handlerMapping.getHandlerMethods();
+        Map<String, RequestMappingInfo> currentEndpointKeys = collectCurrentEndpointKeys(handlerMethods);
+        
+        // Process endpoints with caching logic
+        List<EndpointMetadata> endpoints = processEndpointsWithCache(currentEndpointKeys, handlerMethods, ttlMillis, now);
+        
+        return endpoints;
+    }
+
+    /**
+     * Collects and filters current endpoint keys from Spring handler methods.
+     * Skips library endpoints and generates unique keys for each endpoint.
+     *
+     * @param handlerMethods the handler methods from Spring
+     * @return map of endpoint keys to their request mapping info
+     */
+    private Map<String, RequestMappingInfo> collectCurrentEndpointKeys(Map<RequestMappingInfo, HandlerMethod> handlerMethods) {
         logger.debug("Found {} handler methods", handlerMethods.size());
         
-        // Build a map of endpoint keys from current handlers
         Map<String, RequestMappingInfo> currentEndpointKeys = new HashMap<>();
         for (Map.Entry<RequestMappingInfo, HandlerMethod> entry : handlerMethods.entrySet()) {
             RequestMappingInfo mappingInfo = entry.getKey();
@@ -85,6 +101,25 @@ public class EndpointDiscoveryService implements ApplicationListener<ContextRefr
         
         // Remove stale endpoints from cache (no longer exist in Spring)
         cachedEndpointsMap.keySet().retainAll(currentEndpointKeys.keySet());
+        
+        return currentEndpointKeys;
+    }
+
+    /**
+     * Processes endpoints using cache-or-refresh logic.
+     * Returns cached endpoints if still valid, otherwise rediscovers them.
+     *
+     * @param currentEndpointKeys map of endpoint keys to request mapping info
+     * @param handlerMethods all handler methods from Spring
+     * @param ttlMillis cache TTL in milliseconds
+     * @param now current timestamp
+     * @return list of endpoint metadata
+     */
+    private List<EndpointMetadata> processEndpointsWithCache(
+            Map<String, RequestMappingInfo> currentEndpointKeys,
+            Map<RequestMappingInfo, HandlerMethod> handlerMethods,
+            long ttlMillis,
+            long now) {
         
         List<EndpointMetadata> endpoints = new ArrayList<>();
         int cachedCount = 0;
