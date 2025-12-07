@@ -1,32 +1,29 @@
-# MCP Gateway Enhancements Design
+# MCP Gateway Design Snapshot
 
-## Goals
-- Provide structured, traceable error payloads for MCP executions.
-- Improve resiliency via tool name tolerance and cached discovery.
-- Enrich tool metadata, especially for GraphQL operations, so clients can reason about argument shapes.
-- Document validation and refresh flows so operators know how to reset caches.
+## What the system must deliver
+- Structured, traceable error payloads for every MCP execution.
+- Resilient tool resolution (name normalization and partial matches).
+- Cached discovery for REST and GraphQL tools with a refresh hook.
+- Rich tool metadata so clients understand argument shape and nullability.
 
-## Error Contract
-- `McpToolExecutionResponse` now includes `errorCode`, `requestId`, and `details` fields.
-- Controllers generate a `requestId` per execution and propagate it through the service layer.
-- Validation failures return `errorCode=validation_error` with binding errors in `details`.
-- Runtime failures use stable codes (`tool_not_found`, `execution_error`, `serialization_error`, `internal_error`) with the same `requestId` clients receive.
+## Error contract
+- `McpToolExecutionResponse` always includes a `requestId`; errors add `errorCode` and optional `details`.
+- Stable error codes: `validation_error`, `tool_not_found`, `execution_error`, `serialization_error`, `internal_error`.
+- Controllers generate the `requestId` per execution and pass it through responses.
+- Validation exposes Spring binding errors inside `details`.
 
-## Discovery Caching
-- REST and GraphQL discovery services maintain a 5-minute in-memory cache to avoid reflection scans on every call.
-- `/mcp/tools/refresh` invalidates caches across REST, GraphQL, and tool mappings before recomputing tools.
+## Discovery and refresh
+- REST and GraphQL discovery results are cached in-memory for 5 minutes.
+- `/mcp/tools/refresh` clears discovery caches and tool mappings before recomputing.
 
-## Tool Resolution Resilience
-- Tool lookups now normalize names (lowercase, strip non-alphanumerics) and allow partial containment matches, improving compatibility with minor naming drifts.
-- Both REST and GraphQL resolution paths share the normalization strategy.
+## Tool resolution rules
+- Normalize names to lowercase alphanumerics and allow containment matches so near-miss names still resolve.
+- REST and GraphQL share the same normalization strategy.
 
-## GraphQL Metadata
-- GraphQL input schemas add `graphqlType`, `javaType`, and `nullable` hints per argument.
-- Existing required detection is reused; nullable is computed as the inverse.
-- JSON schema maps still include the previous `type` hints for compatibility.
-
-## Validation Hooks
-- Execution requests enforce `name` via Bean Validation; Spring’s binding errors are surfaced in the structured response.
+## Metadata expectations
+- GraphQL argument schemas publish `graphqlType`, `javaType`, `nullable`, plus existing JSON schema `type`.
+- REST schemas include `javaType` for parity.
 
 ## Compatibility
-- Success responses retain the prior `content` shape, with the addition of `requestId` for traceability. Error responses remain backward-compatible via `content` while layering structured fields.
+- Successful responses keep the legacy `content` structure; `requestId` is additive.
+- Error responses stay backward compatible while adding structured fields.
