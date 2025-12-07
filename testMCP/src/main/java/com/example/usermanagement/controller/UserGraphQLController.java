@@ -58,4 +58,37 @@ public class UserGraphQLController {
     public Boolean deleteUser(@Argument Long id) {
         return userService.deleteUser(id);
     }
+
+    /**
+     * Test GraphQL query with optional parameters.
+     * Tests nullable, graphqlType, and javaType metadata.
+     */
+    @QueryMapping
+    public List<User> advancedSearch(
+            @Argument String keyword,  // Required parameter
+            @Argument(name = "maxResults") Integer maxResults,  // Optional parameter
+            @Argument(name = "includeInactive") Boolean includeInactive) {  // Optional parameter
+        
+        return userService.getAllUsers().stream()
+                .filter(user -> keyword == null || 
+                        user.getName().toLowerCase().contains(keyword.toLowerCase()) ||
+                        user.getEmail().toLowerCase().contains(keyword.toLowerCase()))
+                .limit(maxResults != null ? maxResults : 100)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Test GraphQL mutation with mixed parameter types.
+     * Tests various javaType values in GraphQL metadata.
+     */
+    @MutationMapping
+    public String complexOperation(
+            @Argument Long targetId,
+            @Argument Integer priority,
+            @Argument Double score,
+            @Argument Boolean confirmed) {
+        
+        return String.format("Operation: targetId=%d, priority=%d, score=%.2f, confirmed=%b",
+                targetId, priority, score, confirmed);
+    }
 }

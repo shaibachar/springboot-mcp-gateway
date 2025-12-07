@@ -69,6 +69,7 @@ public class McpController {
      * REST endpoint with the provided arguments.
      *
      * @param request the tool execution request
+     * @param bindingResult the binding result for validation
      * @return response containing the execution result
      */
     @PostMapping("/tools/execute")

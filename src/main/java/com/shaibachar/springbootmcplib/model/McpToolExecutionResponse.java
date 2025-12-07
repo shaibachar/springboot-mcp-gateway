@@ -114,26 +114,56 @@ public class McpToolExecutionResponse {
         this.isError = isError;
     }
 
+    /**
+     * Gets the error code.
+     *
+     * @return the error code
+     */
     public String getErrorCode() {
         return errorCode;
     }
 
+    /**
+     * Sets the error code.
+     *
+     * @param errorCode the error code
+     */
     public void setErrorCode(String errorCode) {
         this.errorCode = errorCode;
     }
 
+    /**
+     * Gets the request ID.
+     *
+     * @return the request ID
+     */
     public String getRequestId() {
         return requestId;
     }
 
+    /**
+     * Sets the request ID.
+     *
+     * @param requestId the request ID
+     */
     public void setRequestId(String requestId) {
         this.requestId = requestId;
     }
 
+    /**
+     * Gets the error details.
+     *
+     * @return the error details
+     */
     public Object getDetails() {
         return details;
     }
 
+    /**
+     * Sets the error details.
+     *
+     * @param details the error details
+     */
     public void setDetails(Object details) {
         this.details = details;
     }

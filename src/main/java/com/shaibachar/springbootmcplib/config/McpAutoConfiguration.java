@@ -6,6 +6,7 @@ import com.shaibachar.springbootmcplib.service.EndpointDiscoveryService;
 import com.shaibachar.springbootmcplib.service.GraphQLDiscoveryService;
 import com.shaibachar.springbootmcplib.service.McpToolExecutionService;
 import com.shaibachar.springbootmcplib.service.McpToolMappingService;
+import com.shaibachar.springbootmcplib.util.TimeProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -36,18 +37,32 @@ public class McpAutoConfiguration {
     }
 
     /**
+     * Creates the time provider bean.
+     *
+     * @return the time provider
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public TimeProvider timeProvider() {
+        logger.debug("Creating TimeProvider bean");
+        return new TimeProvider();
+    }
+
+    /**
      * Creates the endpoint discovery service bean.
      *
      * @param handlerMapping the Spring request mapping handler
      * @param properties the MCP properties
+     * @param timeProvider the time provider
      * @return the endpoint discovery service
      */
     @Bean
     @ConditionalOnMissingBean
     public EndpointDiscoveryService endpointDiscoveryService(RequestMappingHandlerMapping handlerMapping,
-                                                             McpProperties properties) {
+                                                             McpProperties properties,
+                                                             TimeProvider timeProvider) {
         logger.debug("Creating EndpointDiscoveryService bean");
-        return new EndpointDiscoveryService(handlerMapping, properties);
+        return new EndpointDiscoveryService(handlerMapping, properties, timeProvider);
     }
 
     /**
@@ -55,14 +70,16 @@ public class McpAutoConfiguration {
      *
      * @param applicationContext the Spring application context
      * @param properties the MCP properties
+     * @param timeProvider the time provider
      * @return the GraphQL discovery service
      */
     @Bean
     @ConditionalOnMissingBean
     public GraphQLDiscoveryService graphQLDiscoveryService(ApplicationContext applicationContext,
-                                                          McpProperties properties) {
+                                                          McpProperties properties,
+                                                          TimeProvider timeProvider) {
         logger.debug("Creating GraphQLDiscoveryService bean");
-        return new GraphQLDiscoveryService(applicationContext, properties);
+        return new GraphQLDiscoveryService(applicationContext, properties, timeProvider);
     }
 
     /**

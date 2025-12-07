@@ -2,6 +2,7 @@ package com.shaibachar.springbootmcplib.service;
 
 import com.shaibachar.springbootmcplib.config.McpProperties;
 import com.shaibachar.springbootmcplib.model.EndpointMetadata;
+import com.shaibachar.springbootmcplib.util.TimeProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -21,6 +22,9 @@ class EndpointDiscoveryServiceTest {
     @Mock
     private RequestMappingHandlerMapping handlerMapping;
 
+    @Mock
+    private TimeProvider timeProvider;
+
     private EndpointDiscoveryService discoveryService;
 
     @BeforeEach
@@ -28,7 +32,8 @@ class EndpointDiscoveryServiceTest {
         MockitoAnnotations.openMocks(this);
         McpProperties properties = new McpProperties();
         properties.getCache().setTtlMillis(5 * 60 * 1000); // 5 minutes
-        discoveryService = new EndpointDiscoveryService(handlerMapping, properties);
+        when(timeProvider.getCurrentTimeMillis()).thenReturn(System.currentTimeMillis());
+        discoveryService = new EndpointDiscoveryService(handlerMapping, properties, timeProvider);
     }
 
     @Test

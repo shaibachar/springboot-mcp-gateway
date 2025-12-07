@@ -130,10 +130,12 @@ class McpEnhancedFeaturesTest {
 
         // Verify input schema has enriched metadata
         assertNotNull(createUserTool.getInputSchema());
+        @SuppressWarnings("unchecked")
         Map<String, Object> properties = (Map<String, Object>) createUserTool.getInputSchema().get("properties");
         assertNotNull(properties, "Properties should exist in input schema");
 
         // Check 'name' argument has enriched metadata
+        @SuppressWarnings("unchecked")
         Map<String, Object> nameArg = (Map<String, Object>) properties.get("name");
         assertNotNull(nameArg, "name argument should exist");
         
@@ -144,12 +146,20 @@ class McpEnhancedFeaturesTest {
 
         // Verify values
         // Note: graphqlType contains the Java simple type name, not the GraphQL schema type
-        // TODO: Future enhancement - parse GraphQL schema to get actual GraphQL type (e.g., "String!")
+        // CURRENT LIMITATION: The library uses reflection-based discovery which provides Java type information.
+        // FUTURE ENHANCEMENT: Parse GraphQL schema (.graphqls files) to extract actual GraphQL SDL types
+        // (e.g., "String!" for non-null, "String" for nullable, "[String]" for lists)
+        // This would require integrating with graphql-java's schema parser.
         assertEquals("String", nameArg.get("graphqlType"), "GraphQL type should be String");
         assertEquals("java.lang.String", nameArg.get("javaType"), "Java type should be java.lang.String");
-        // Note: Current implementation marks all GraphQL arguments as nullable=true
-        // This is a known limitation where the library doesn't parse the GraphQL schema for nullability
-        // TODO: Future enhancement - parse GraphQL schema to determine actual nullability
+        // CURRENT LIMITATION: All GraphQL arguments are marked as nullable=true because the library
+        // uses runtime reflection and cannot access GraphQL schema definition nullability constraints.
+        // FUTURE ENHANCEMENT: Implement GraphQL schema parsing to detect non-null types (Type!)
+        // Implementation approach:
+        // 1. Load .graphqls schema files from classpath
+        // 2. Use GraphQLSchemaGenerator to build schema
+        // 3. Query schema for field definitions and their type nullability
+        // 4. Map discovered methods to schema fields and extract accurate nullability
         assertEquals(true, nameArg.get("nullable"), "GraphQL arguments are marked as nullable");
     }
 
@@ -171,20 +181,30 @@ class McpEnhancedFeaturesTest {
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("updateUser GraphQL mutation not found"));
 
+        @SuppressWarnings("unchecked")
         Map<String, Object> properties = (Map<String, Object>) updateUserTool.getInputSchema().get("properties");
         assertNotNull(properties);
 
         // Verify all arguments have nullable field
+        @SuppressWarnings("unchecked")
         Map<String, Object> idArg = (Map<String, Object>) properties.get("id");
         assertNotNull(idArg);
         assertTrue(idArg.containsKey("nullable"), "Should have nullable field");
         
-        // Note: Current implementation marks all GraphQL arguments as nullable=true
-        // This is a known limitation where required status from GraphQL schema is not detected
-        // TODO: Future enhancement - implement GraphQL schema parsing to detect required vs optional fields
+        // CURRENT LIMITATION: All GraphQL arguments are marked as nullable=true.
+        // The library cannot distinguish between required (Type!) and optional (Type) fields
+        // without parsing the GraphQL schema definition.
+        // FUTURE ENHANCEMENT: Detect required vs optional fields from schema
+        // Required changes:
+        // 1. Add graphql-java dependency to parse schema files
+        // 2. Create GraphQLSchemaParser utility in the library
+        // 3. Update GraphQLDiscoveryService to load schema and query type definitions
+        // 4. Match @QueryMapping/@MutationMapping methods to schema fields
+        // 5. Extract nullability from GraphQLFieldDefinition.getType()
         assertEquals(true, idArg.get("nullable"), "Current implementation marks all args as nullable");
 
         // Verify other arguments also have the nullable field
+        @SuppressWarnings("unchecked")
         Map<String, Object> nameArg = (Map<String, Object>) properties.get("name");
         if (nameArg != null) {
             assertTrue(nameArg.containsKey("nullable"), "Should have nullable field");
@@ -211,9 +231,11 @@ class McpEnhancedFeaturesTest {
                 .orElseThrow(() -> new AssertionError("getUserById REST tool not found"));
 
         // Verify input schema has javaType for parameters
+        @SuppressWarnings("unchecked")
         Map<String, Object> properties = (Map<String, Object>) getUserByIdTool.getInputSchema().get("properties");
         assertNotNull(properties, "Properties should exist");
 
+        @SuppressWarnings("unchecked")
         Map<String, Object> idParam = (Map<String, Object>) properties.get("id");
         assertNotNull(idParam, "id parameter should exist");
         assertTrue(idParam.containsKey("javaType"), "REST parameter should contain javaType");
@@ -390,7 +412,9 @@ class McpEnhancedFeaturesTest {
                 .orElseThrow(() -> new AssertionError("createUser GraphQL mutation not found"));
 
         // Verify enriched metadata
+        @SuppressWarnings("unchecked")
         Map<String, Object> properties = (Map<String, Object>) createUserTool.getInputSchema().get("properties");
+        @SuppressWarnings("unchecked")
         Map<String, Object> nameArg = (Map<String, Object>) properties.get("name");
         assertTrue(nameArg.containsKey("graphqlType"));
         assertTrue(nameArg.containsKey("javaType"));

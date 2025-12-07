@@ -1,0 +1,15 @@
+{
+    "folders": [
+        {
+            "name": "spring-boot-mcp-lib",
+            "path": "."
+        },
+        {
+            "name": "testMCP",
+            "path": "testMCP"
+        }
+    ],
+    "settings": {
+        "java.configuration.updateBuildConfiguration": "automatic"
+    }
+}

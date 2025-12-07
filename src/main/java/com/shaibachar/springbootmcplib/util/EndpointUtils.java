@@ -99,7 +99,8 @@ public final class EndpointUtils {
         try {
             // Check for @Argument annotation
             Class<?> argumentClass = Class.forName("org.springframework.graphql.data.method.annotation.Argument");
-            Object argumentAnnotation = param.getAnnotation((Class) argumentClass);
+            Class<? extends java.lang.annotation.Annotation> annotationClass = (Class<? extends java.lang.annotation.Annotation>) argumentClass;
+            Object argumentAnnotation = param.getAnnotation(annotationClass);
             if (argumentAnnotation != null) {
                 Method nameMethod = argumentClass.getMethod("name");
                 String name = (String) nameMethod.invoke(argumentAnnotation);
