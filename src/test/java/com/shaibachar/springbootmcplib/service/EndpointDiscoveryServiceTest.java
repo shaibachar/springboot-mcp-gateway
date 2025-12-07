@@ -1,5 +1,6 @@
 package com.shaibachar.springbootmcplib.service;
 
+import com.shaibachar.springbootmcplib.config.McpProperties;
 import com.shaibachar.springbootmcplib.model.EndpointMetadata;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,9 @@ class EndpointDiscoveryServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        discoveryService = new EndpointDiscoveryService(handlerMapping);
+        McpProperties properties = new McpProperties();
+        properties.getCache().setTtlMillis(5 * 60 * 1000); // 5 minutes
+        discoveryService = new EndpointDiscoveryService(handlerMapping, properties);
     }
 
     @Test

@@ -1,5 +1,7 @@
 package com.shaibachar.springbootmcplib.service;
 
+import com.shaibachar.springbootmcplib.config.McpProperties;
+import com.shaibachar.springbootmcplib.model.CachedEndpoint;
 import com.shaibachar.springbootmcplib.model.EndpointMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,6 +15,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 
 import java.lang.reflect.Method;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Service responsible for discovering REST endpoints from Spring MVC controllers.
@@ -25,19 +28,20 @@ public class EndpointDiscoveryService implements ApplicationListener<ContextRefr
     private static final Logger logger = LoggerFactory.getLogger(EndpointDiscoveryService.class);
 
     private final RequestMappingHandlerMapping handlerMapping;
+    private final McpProperties properties;
     private boolean contextRefreshed = false;
-    private List<EndpointMetadata> cachedEndpoints;
-    private long lastDiscoveryTimestamp;
-    private static final long CACHE_TTL_MILLIS = 5 * 60 * 1000; // 5 minutes
+    private final Map<String, CachedEndpoint<EndpointMetadata>> cachedEndpointsMap = new ConcurrentHashMap<>();
 
     /**
      * Constructor with dependency injection.
      *
      * @param handlerMapping Spring's request mapping handler
+     * @param properties the MCP properties
      */
-    public EndpointDiscoveryService(RequestMappingHandlerMapping handlerMapping) {
+    public EndpointDiscoveryService(RequestMappingHandlerMapping handlerMapping, McpProperties properties) {
         this.handlerMapping = handlerMapping;
-        logger.debug("EndpointDiscoveryService initialized");
+        this.properties = properties;
+        logger.debug("EndpointDiscoveryService initialized with TTL: {} ms", properties.getCache().getTtlMillis());
     }
 
     @Override
@@ -48,46 +52,76 @@ public class EndpointDiscoveryService implements ApplicationListener<ContextRefr
 
     /**
      * Discovers all REST endpoints in the application.
-     * Excludes MCP library's own endpoints to avoid recursion.
+     * Uses per-endpoint caching with individual TTL tracking.
+     * Only re-discovers endpoints whose cache has expired.
      *
      * @return list of endpoint metadata
      */
     public List<EndpointMetadata> discoverEndpoints() {
+        logger.debug("Starting endpoint discovery with per-endpoint TTL caching");
+        long ttlMillis = properties.getCache().getTtlMillis();
         long now = System.currentTimeMillis();
-        if (cachedEndpoints != null && (now - lastDiscoveryTimestamp) < CACHE_TTL_MILLIS) {
-            logger.debug("Returning {} cached REST endpoints", cachedEndpoints.size());
-            return new ArrayList<>(cachedEndpoints);
-        }
-
-        logger.debug("Starting endpoint discovery");
-        List<EndpointMetadata> endpoints = new ArrayList<>();
-
+        
+        // Collect all current handler methods from Spring
         Map<RequestMappingInfo, HandlerMethod> handlerMethods = handlerMapping.getHandlerMethods();
         logger.debug("Found {} handler methods", handlerMethods.size());
-
+        
+        // Build a map of endpoint keys from current handlers
+        Map<String, RequestMappingInfo> currentEndpointKeys = new HashMap<>();
         for (Map.Entry<RequestMappingInfo, HandlerMethod> entry : handlerMethods.entrySet()) {
             RequestMappingInfo mappingInfo = entry.getKey();
             HandlerMethod handlerMethod = entry.getValue();
-
+            
             // Skip MCP library's own endpoints
             if (isLibraryEndpoint(handlerMethod)) {
-                logger.debug("Skipping library endpoint: {}", handlerMethod.getMethod().getName());
                 continue;
             }
-
-            EndpointMetadata metadata = createEndpointMetadata(mappingInfo, handlerMethod);
-            if (metadata != null) {
-                endpoints.add(metadata);
-                logger.debug("Discovered endpoint: {} {} - {}", 
-                    metadata.getHttpMethod(), 
-                    metadata.getFullPath(), 
-                    metadata.getHandlerMethod().getName());
+            
+            String endpointKey = generateEndpointKey(mappingInfo, handlerMethod);
+            if (endpointKey != null) {
+                currentEndpointKeys.put(endpointKey, mappingInfo);
             }
         }
-
-        logger.debug("Endpoint discovery completed. Found {} endpoints", endpoints.size());
-        cachedEndpoints = endpoints;
-        lastDiscoveryTimestamp = now;
+        
+        // Remove stale endpoints from cache (no longer exist in Spring)
+        cachedEndpointsMap.keySet().retainAll(currentEndpointKeys.keySet());
+        
+        List<EndpointMetadata> endpoints = new ArrayList<>();
+        int cachedCount = 0;
+        int refreshedCount = 0;
+        
+        // Process each endpoint
+        for (Map.Entry<String, RequestMappingInfo> entry : currentEndpointKeys.entrySet()) {
+            String endpointKey = entry.getKey();
+            RequestMappingInfo mappingInfo = entry.getValue();
+            
+            CachedEndpoint<EndpointMetadata> cached = cachedEndpointsMap.get(endpointKey);
+            
+            if (cached != null && !cached.isExpired(ttlMillis)) {
+                // Use cached endpoint
+                endpoints.add(cached.getEndpoint());
+                cachedCount++;
+                logger.debug("Using cached endpoint: {}", endpointKey);
+            } else {
+                // Rediscover this specific endpoint
+                HandlerMethod handlerMethod = handlerMethods.get(mappingInfo);
+                EndpointMetadata metadata = createEndpointMetadata(mappingInfo, handlerMethod);
+                
+                if (metadata != null) {
+                    endpoints.add(metadata);
+                    cachedEndpointsMap.put(endpointKey, new CachedEndpoint<>(metadata, now));
+                    refreshedCount++;
+                    logger.debug("Refreshed endpoint: {} {} - {}", 
+                        metadata.getHttpMethod(), 
+                        metadata.getFullPath(), 
+                        metadata.getHandlerMethod().getName());
+                }
+            }
+        }
+        
+        logger.debug("Endpoint discovery completed. Total: {}, Cached: {}, Refreshed: {}", 
+            endpoints.size(), cachedCount, refreshedCount);
+        
         return endpoints;
     }
 
@@ -95,8 +129,35 @@ public class EndpointDiscoveryService implements ApplicationListener<ContextRefr
      * Clears cached discovery results.
      */
     public void clearCache() {
-        cachedEndpoints = null;
-        lastDiscoveryTimestamp = 0L;
+        cachedEndpointsMap.clear();
+        logger.debug("Cleared endpoint cache");
+    }
+
+    /**
+     * Generates a unique key for an endpoint to track in the cache.
+     *
+     * @param mappingInfo the request mapping information
+     * @param handlerMethod the handler method
+     * @return the endpoint key or null if invalid
+     */
+    private String generateEndpointKey(RequestMappingInfo mappingInfo, HandlerMethod handlerMethod) {
+        Set<String> patterns = mappingInfo.getPatternValues();
+        if (patterns.isEmpty()) {
+            return null;
+        }
+        
+        Set<org.springframework.web.bind.annotation.RequestMethod> methods = 
+            mappingInfo.getMethodsCondition().getMethods();
+        if (methods.isEmpty()) {
+            return null;
+        }
+        
+        String path = patterns.iterator().next();
+        String httpMethod = methods.iterator().next().name();
+        String className = handlerMethod.getBeanType().getName();
+        String methodName = handlerMethod.getMethod().getName();
+        
+        return httpMethod + ":" + path + ":" + className + ":" + methodName;
     }
 
     /**
