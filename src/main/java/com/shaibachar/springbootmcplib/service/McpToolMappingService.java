@@ -14,6 +14,10 @@ import java.util.*;
 /**
  * Service responsible for mapping REST and GraphQL endpoints to MCP tools.
  * Converts Spring MVC endpoint metadata into MCP tool definitions with JSON schemas.
+ * 
+ * Thread Safety: This service is thread-safe. The cachedTools field uses volatile semantics
+ * with double-checked locking to ensure safe publication across threads. All caches are
+ * cleared atomically during refresh operations.
  */
 public class McpToolMappingService {
 
@@ -21,7 +25,7 @@ public class McpToolMappingService {
 
     private final EndpointDiscoveryService discoveryService;
     private final GraphQLDiscoveryService graphQLDiscoveryService;
-    private List<McpTool> cachedTools;
+    private volatile List<McpTool> cachedTools;
 
     /**
      * Constructor with dependency injection.
@@ -38,34 +42,47 @@ public class McpToolMappingService {
 
     /**
      * Gets all available MCP tools.
-     * Results are cached after first call.
+     * Results are cached after first call using thread-safe double-checked locking.
+     * Returns a defensive copy to prevent external mutation of the cache.
      *
-     * @return list of MCP tools
+     * @return list of MCP tools (defensive copy)
      */
     public List<McpTool> getAllTools() {
-        if (cachedTools == null) {
-            logger.debug("Building MCP tools from discovered endpoints");
-            List<EndpointMetadata> restEndpoints = discoveryService.discoverEndpoints();
-            List<GraphQLEndpointMetadata> graphqlEndpoints = graphQLDiscoveryService.discoverGraphQLEndpoints();
-            
-            cachedTools = new ArrayList<>();
-            cachedTools.addAll(mapEndpointsToTools(restEndpoints));
-            cachedTools.addAll(mapGraphQLEndpointsToTools(graphqlEndpoints));
-            
-            logger.debug("Built {} MCP tools ({} REST, {} GraphQL)", 
-                    cachedTools.size(), restEndpoints.size(), graphqlEndpoints.size());
+        // Double-checked locking for thread-safe lazy initialization
+        List<McpTool> tools = cachedTools;
+        if (tools == null) {
+            synchronized (this) {
+                tools = cachedTools;
+                if (tools == null) {
+                    logger.debug("Building MCP tools from discovered endpoints");
+                    List<EndpointMetadata> restEndpoints = discoveryService.discoverEndpoints();
+                    List<GraphQLEndpointMetadata> graphqlEndpoints = graphQLDiscoveryService.discoverGraphQLEndpoints();
+                    
+                    List<McpTool> newTools = new ArrayList<>();
+                    newTools.addAll(mapEndpointsToTools(restEndpoints));
+                    newTools.addAll(mapGraphQLEndpointsToTools(graphqlEndpoints));
+                    
+                    logger.debug("Built {} MCP tools ({} REST, {} GraphQL)", 
+                            newTools.size(), restEndpoints.size(), graphqlEndpoints.size());
+                    
+                    cachedTools = tools = newTools;
+                }
+            }
         }
-        return new ArrayList<>(cachedTools);
+        // Return defensive copy to prevent external mutation
+        return new ArrayList<>(tools);
     }
 
     /**
      * Refreshes the tool cache by re-discovering endpoints.
+     * This method is synchronized to prevent concurrent refresh operations.
      */
-    public void refreshTools() {
+    public synchronized void refreshTools() {
         logger.debug("Refreshing MCP tools cache");
         discoveryService.clearCache();
         graphQLDiscoveryService.clearCache();
         cachedTools = null;
+        // Rebuild cache immediately to avoid race conditions
         getAllTools();
     }
 
@@ -362,29 +379,10 @@ public class McpToolMappingService {
      * @return the parameter schema
      */
     private Map<String, Object> generateParameterSchema(Parameter param) {
-        Map<String, Object> schema = new HashMap<>();
-        Class<?> type = param.getType();
-
-        // Map Java types to JSON schema types
-        if (type == String.class) {
-            schema.put("type", "string");
-        } else if (type == Integer.class || type == int.class ||
-                   type == Long.class || type == long.class) {
-            schema.put("type", "integer");
-        } else if (type == Double.class || type == double.class ||
-                   type == Float.class || type == float.class) {
-            schema.put("type", "number");
-        } else if (type == Boolean.class || type == boolean.class) {
-            schema.put("type", "boolean");
-        } else if (type.isArray() || Collection.class.isAssignableFrom(type)) {
-            schema.put("type", "array");
-        } else {
-            // For complex objects, use object type
-            schema.put("type", "object");
-        }
-
+        Map<String, Object> schema = mapJavaTypeToJsonSchema(param.getType());
+        
         // Add javaType for all parameters
-        schema.put("javaType", type.getName());
+        schema.put("javaType", param.getType().getName());
         
         // Add nullable field (inverse of required)
         schema.put("nullable", !isRequiredParameter(param));
@@ -399,8 +397,25 @@ public class McpToolMappingService {
      * @return the parameter schema
      */
     private Map<String, Object> generateGraphQLParameterSchema(Parameter param) {
+        Map<String, Object> schema = mapJavaTypeToJsonSchema(param.getType());
+
+        // Add GraphQL-specific metadata
+        schema.put("graphqlType", param.getType().getSimpleName());
+        schema.put("javaType", param.getType().getName());
+        schema.put("nullable", !isGraphQLRequiredParameter(param));
+
+        return schema;
+    }
+
+    /**
+     * Maps a Java type to a JSON schema type definition.
+     * This is the common type mapping logic used for both REST and GraphQL parameters.
+     *
+     * @param type the Java class type
+     * @return map containing the JSON schema "type" field
+     */
+    private Map<String, Object> mapJavaTypeToJsonSchema(Class<?> type) {
         Map<String, Object> schema = new HashMap<>();
-        Class<?> type = param.getType();
 
         // Map Java types to JSON schema types
         if (type == String.class) {
@@ -419,11 +434,6 @@ public class McpToolMappingService {
             // For complex objects, use object type
             schema.put("type", "object");
         }
-
-        // Add GraphQL-specific metadata
-        schema.put("graphqlType", type.getSimpleName());
-        schema.put("javaType", type.getName());
-        schema.put("nullable", !isGraphQLRequiredParameter(param));
 
         return schema;
     }

@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
+import jakarta.annotation.PreDestroy;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
@@ -22,6 +23,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * Scans the application context for all registered request mappings and builds
  * endpoint metadata.
  * Implements ApplicationListener to ensure discovery happens after context is fully initialized.
+ * 
+ * Thread Safety: This service is thread-safe. Discovery results are cached in a ConcurrentHashMap
+ * with per-endpoint TTL tracking. The cache is bounded by the number of endpoints in the application
+ * and uses TTL-based eviction to prevent unbounded growth.
  */
 public class EndpointDiscoveryService implements ApplicationListener<ContextRefreshedEvent> {
 
@@ -166,6 +171,16 @@ public class EndpointDiscoveryService implements ApplicationListener<ContextRefr
     public void clearCache() {
         cachedEndpointsMap.clear();
         logger.debug("Cleared endpoint cache");
+    }
+
+    /**
+     * Cleanup method called when the bean is destroyed.
+     * Ensures resources are released to prevent memory leaks.
+     */
+    @PreDestroy
+    public void destroy() {
+        logger.debug("Shutting down EndpointDiscoveryService");
+        clearCache();
     }
 
     /**

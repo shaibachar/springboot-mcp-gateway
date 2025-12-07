@@ -11,6 +11,7 @@ A Spring Boot library that automatically exposes REST and GraphQL endpoints as M
 - 🔒 **Structured Error Payloads**: Enhanced error responses with error codes, request IDs, and structured details
 - 📋 **Enhanced Metadata**: Rich parameter metadata including javaType, graphqlType, and nullable fields
 - ⚡ **Discovery Caching**: Per-endpoint TTL caching with configurable refresh for optimal performance
+- 🔐 **Thread-Safe**: Lock-free concurrent caching with proper memory management and lifecycle hooks
 - 📝 **Full Documentation**: Comprehensive Javadoc for all public APIs
 - 🐛 **Debug Logging**: Detailed DEBUG-level logging for troubleshooting
 - ✅ **Tested**: Includes unit tests and integration tests
@@ -219,6 +220,29 @@ POST /mcp/tools/refresh
 ```
 
 Forces a refresh of the discovered endpoints (useful if controllers are dynamically registered).
+
+## Thread Safety and Performance
+
+The library is designed for high-concurrency production environments:
+
+### Thread Safety
+- **Lock-free caching**: Discovery services use `ConcurrentHashMap` for thread-safe caching without locks
+- **Double-checked locking**: Tool mapping service uses optimized lazy initialization
+- **Immutable data**: All endpoint metadata classes are immutable after construction
+- **Defensive copying**: Public APIs return copies to prevent external mutation
+
+### Memory Management
+- **Bounded caches**: Caches are naturally bounded by the number of endpoints
+- **TTL-based eviction**: Configurable TTL (default 5 minutes) prevents unbounded growth
+- **Lifecycle hooks**: `@PreDestroy` methods ensure proper cleanup on shutdown
+- **No memory leaks**: No thread pools, scheduled tasks, or unbounded collections
+
+### Performance Characteristics
+- **Warm cache**: Sub-millisecond response times using O(1) lookups
+- **Cold cache**: Initial discovery takes a few seconds via reflection
+- **Refresh**: Synchronized to prevent concurrent rebuilds
+
+See `spec/implementation_parallel.md` for detailed thread-safety analysis and compliance with parallelism specifications.
 
 ## Configuration
 

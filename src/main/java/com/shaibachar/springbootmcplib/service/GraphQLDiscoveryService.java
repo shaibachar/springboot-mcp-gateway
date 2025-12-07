@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
+import jakarta.annotation.PreDestroy;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -18,6 +19,10 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Service responsible for discovering GraphQL endpoints from Spring GraphQL controllers.
  * Scans for classes annotated with @Controller and methods annotated with GraphQL annotations.
+ * 
+ * Thread Safety: This service is thread-safe. Discovery results are cached in a ConcurrentHashMap
+ * with per-endpoint TTL tracking. The cache is bounded by the number of GraphQL endpoints and uses
+ * TTL-based eviction to prevent memory leaks.
  */
 public class GraphQLDiscoveryService {
 
@@ -72,66 +77,21 @@ public class GraphQLDiscoveryService {
      */
     public List<GraphQLEndpointMetadata> discoverGraphQLEndpoints() {
         logger.debug("Starting GraphQL endpoint discovery with per-endpoint TTL caching");
-        long ttlMillis = properties.getCache().getTtlMillis();
-        long now = timeProvider.getCurrentTimeMillis();
-
+        
         if (!graphqlAvailable) {
             logger.debug("GraphQL not available, skipping discovery");
             return new ArrayList<>();
         }
 
         try {
-            // Get all beans with @Controller annotation
-            Map<String, Object> controllers = applicationContext.getBeansWithAnnotation(
-                    org.springframework.stereotype.Controller.class);
-
-            // Collect all current GraphQL endpoints
-            Map<String, GraphQLEndpointMetadata> currentEndpoints = new java.util.HashMap<>();
+            long ttlMillis = properties.getCache().getTtlMillis();
+            long now = timeProvider.getCurrentTimeMillis();
             
-            for (Map.Entry<String, Object> entry : controllers.entrySet()) {
-                Object controller = entry.getValue();
-                Class<?> controllerClass = controller.getClass();
-
-                // Skip library's own controllers
-                if (isLibraryController(controllerClass)) {
-                    continue;
-                }
-
-                // Discover GraphQL methods and collect them
-                discoverGraphQLMethodsInController(controllerClass, currentEndpoints, now);
-            }
-
-            // Remove stale endpoints from cache (no longer exist)
-            cachedEndpointsMap.keySet().retainAll(currentEndpoints.keySet());
-
-            List<GraphQLEndpointMetadata> endpoints = new ArrayList<>();
-            int cachedCount = 0;
-            int refreshedCount = 0;
-
-            // Process each endpoint
-            for (Map.Entry<String, GraphQLEndpointMetadata> entry : currentEndpoints.entrySet()) {
-                String endpointKey = entry.getKey();
-                GraphQLEndpointMetadata metadata = entry.getValue();
-
-                CachedEndpoint<GraphQLEndpointMetadata> cached = cachedEndpointsMap.get(endpointKey);
-
-                if (cached != null && !cached.isExpired(ttlMillis)) {
-                    // Use cached endpoint
-                    endpoints.add(cached.getEndpoint());
-                    cachedCount++;
-                    logger.debug("Using cached GraphQL endpoint: {}", endpointKey);
-                } else {
-                    // Use newly discovered endpoint
-                    endpoints.add(metadata);
-                    cachedEndpointsMap.put(endpointKey, new CachedEndpoint<>(metadata, now));
-                    refreshedCount++;
-                    logger.debug("Refreshed GraphQL endpoint: {} - {}", 
-                        metadata.getOperationType(), metadata.getFieldName());
-                }
-            }
-
-            logger.debug("GraphQL endpoint discovery completed. Total: {}, Cached: {}, Refreshed: {}", 
-                endpoints.size(), cachedCount, refreshedCount);
+            // Collect current endpoints from all controllers
+            Map<String, GraphQLEndpointMetadata> currentEndpoints = collectCurrentEndpoints();
+            
+            // Process endpoints with cache-or-refresh logic
+            List<GraphQLEndpointMetadata> endpoints = processEndpointsWithCache(currentEndpoints, ttlMillis, now);
             
             return endpoints;
         } catch (Exception e) {
@@ -141,11 +101,99 @@ public class GraphQLDiscoveryService {
     }
 
     /**
+     * Collects all current GraphQL endpoints from application controllers.
+     * Discovers endpoints from all @Controller beans and filters out library controllers.
+     *
+     * @return map of endpoint keys to their metadata
+     */
+    private Map<String, GraphQLEndpointMetadata> collectCurrentEndpoints() {
+        Map<String, Object> controllers = applicationContext.getBeansWithAnnotation(
+                org.springframework.stereotype.Controller.class);
+
+        Map<String, GraphQLEndpointMetadata> currentEndpoints = new java.util.HashMap<>();
+        long now = timeProvider.getCurrentTimeMillis();
+        
+        for (Map.Entry<String, Object> entry : controllers.entrySet()) {
+            Object controller = entry.getValue();
+            Class<?> controllerClass = controller.getClass();
+
+            // Skip library's own controllers
+            if (isLibraryController(controllerClass)) {
+                continue;
+            }
+
+            // Discover GraphQL methods and collect them
+            discoverGraphQLMethodsInController(controllerClass, currentEndpoints, now);
+        }
+
+        // Remove stale endpoints from cache (no longer exist)
+        cachedEndpointsMap.keySet().retainAll(currentEndpoints.keySet());
+        
+        return currentEndpoints;
+    }
+
+    /**
+     * Processes endpoints using cache-or-refresh logic.
+     * Returns cached endpoints if still valid, otherwise uses newly discovered ones.
+     *
+     * @param currentEndpoints map of discovered endpoint keys to metadata
+     * @param ttlMillis cache TTL in milliseconds
+     * @param now current timestamp
+     * @return list of endpoint metadata (cached or refreshed)
+     */
+    private List<GraphQLEndpointMetadata> processEndpointsWithCache(
+            Map<String, GraphQLEndpointMetadata> currentEndpoints,
+            long ttlMillis,
+            long now) {
+        
+        List<GraphQLEndpointMetadata> endpoints = new ArrayList<>();
+        int cachedCount = 0;
+        int refreshedCount = 0;
+
+        // Process each endpoint
+        for (Map.Entry<String, GraphQLEndpointMetadata> entry : currentEndpoints.entrySet()) {
+            String endpointKey = entry.getKey();
+            GraphQLEndpointMetadata metadata = entry.getValue();
+
+            CachedEndpoint<GraphQLEndpointMetadata> cached = cachedEndpointsMap.get(endpointKey);
+
+            if (cached != null && !cached.isExpired(ttlMillis)) {
+                // Use cached endpoint
+                endpoints.add(cached.getEndpoint());
+                cachedCount++;
+                logger.debug("Using cached GraphQL endpoint: {}", endpointKey);
+            } else {
+                // Use newly discovered endpoint
+                endpoints.add(metadata);
+                cachedEndpointsMap.put(endpointKey, new CachedEndpoint<>(metadata, now));
+                refreshedCount++;
+                logger.debug("Refreshed GraphQL endpoint: {} - {}", 
+                    metadata.getOperationType(), metadata.getFieldName());
+            }
+        }
+
+        logger.debug("GraphQL endpoint discovery completed. Total: {}, Cached: {}, Refreshed: {}", 
+            endpoints.size(), cachedCount, refreshedCount);
+        
+        return endpoints;
+    }
+
+    /**
      * Clears cached discovery results.
      */
     public void clearCache() {
         cachedEndpointsMap.clear();
         logger.debug("Cleared GraphQL endpoint cache");
+    }
+
+    /**
+     * Cleanup method called when the bean is destroyed.
+     * Ensures resources are released to prevent memory leaks.
+     */
+    @PreDestroy
+    public void destroy() {
+        logger.debug("Shutting down GraphQLDiscoveryService");
+        clearCache();
     }
 
     /**
