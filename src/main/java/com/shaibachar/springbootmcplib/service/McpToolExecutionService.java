@@ -305,6 +305,7 @@ public class McpToolExecutionService {
      * Creates a success response from the result.
      *
      * @param result the result object
+     * @param requestId the correlation ID for this request
      * @return the execution response
      */
     public McpToolExecutionResponse createSuccessResponse(Object result, String requestId) {
@@ -326,7 +327,10 @@ public class McpToolExecutionService {
     /**
      * Creates an error response.
      *
+     * @param errorCode the stable error code
+     * @param requestId the correlation ID for this request
      * @param errorMessage the error message
+     * @param details optional structured error details
      * @return the execution response
      */
     public McpToolExecutionResponse createErrorResponse(McpErrorCode errorCode, String requestId, String errorMessage, Object details) {

@@ -14,3 +14,5 @@ Flag the main delivery and operational risks with quick mitigations for the MCP 
   - Add contract tests in CI to exercise success, validation failure, and unknown tool paths.
 - **Cache eviction latency under load**: Heavy refresh traffic could temporarily stall tool resolution.
   - Keep refresh idempotent and short-lived; monitor refresh latency and adjust cache size or TTL if needed.
+- **Memory leaks in long-running applications**: Without proper cleanup, caches could retain stale references.
+  - Both discovery services implement `@PreDestroy` cleanup methods that clear caches when the Spring bean is destroyed, ensuring resources are released in container environments.

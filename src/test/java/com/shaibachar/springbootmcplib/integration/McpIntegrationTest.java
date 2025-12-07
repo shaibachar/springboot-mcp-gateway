@@ -39,11 +39,18 @@ class McpIntegrationTest {
                 .andReturn();
 
         String content = result.getResponse().getContentAsString();
-        McpToolsResponse response = objectMapper.readValue(content, McpToolsResponse.class);
+        McpToolExecutionResponse executionResponse = objectMapper.readValue(content, McpToolExecutionResponse.class);
 
+        assertNotNull(executionResponse);
+        assertFalse(executionResponse.getIsError());
+        assertNotNull(executionResponse.getContent());
+        
+        // Extract McpToolsResponse from the content
+        String toolsJson = executionResponse.getContent().get(0).getText();
+        McpToolsResponse response = objectMapper.readValue(toolsJson, McpToolsResponse.class);
+        
         assertNotNull(response);
         assertNotNull(response.getTools());
-        
         assertTrue(response.getTools().size() > 0, "Should discover at least one tool");
 
         // Check that test controller endpoints are discovered
@@ -60,7 +67,9 @@ class McpIntegrationTest {
                 .andReturn();
 
         String listContent = listResult.getResponse().getContentAsString();
-        McpToolsResponse toolsResponse = objectMapper.readValue(listContent, McpToolsResponse.class);
+        McpToolExecutionResponse executionResponse = objectMapper.readValue(listContent, McpToolExecutionResponse.class);
+        String toolsJson = executionResponse.getContent().get(0).getText();
+        McpToolsResponse toolsResponse = objectMapper.readValue(toolsJson, McpToolsResponse.class);
 
         // Find the hello endpoint tool
         McpTool helloTool = toolsResponse.getTools().stream()
@@ -98,7 +107,9 @@ class McpIntegrationTest {
                 .andReturn();
 
         String listContent = listResult.getResponse().getContentAsString();
-        McpToolsResponse toolsResponse = objectMapper.readValue(listContent, McpToolsResponse.class);
+        McpToolExecutionResponse executionResponse = objectMapper.readValue(listContent, McpToolExecutionResponse.class);
+        String toolsJson = executionResponse.getContent().get(0).getText();
+        McpToolsResponse toolsResponse = objectMapper.readValue(toolsJson, McpToolsResponse.class);
 
         // Find the getUser endpoint tool
         McpTool getUserTool = toolsResponse.getTools().stream()
@@ -138,7 +149,9 @@ class McpIntegrationTest {
                 .andReturn();
 
         String listContent = listResult.getResponse().getContentAsString();
-        McpToolsResponse toolsResponse = objectMapper.readValue(listContent, McpToolsResponse.class);
+        McpToolExecutionResponse executionResponse = objectMapper.readValue(listContent, McpToolExecutionResponse.class);
+        String toolsJson = executionResponse.getContent().get(0).getText();
+        McpToolsResponse toolsResponse = objectMapper.readValue(toolsJson, McpToolsResponse.class);
 
         // Find the greet endpoint tool
         McpTool greetTool = toolsResponse.getTools().stream()

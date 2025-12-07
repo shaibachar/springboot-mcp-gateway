@@ -15,6 +15,7 @@
 ## Discovery and refresh
 - REST and GraphQL discovery results are cached in-memory for 5 minutes.
 - `/mcp/tools/refresh` clears discovery caches and tool mappings before recomputing.
+- **Library endpoint filtering**: Discovery automatically excludes the MCP library's own controller endpoints (McpController) to prevent self-reference and infinite recursion. Only application endpoints are exposed as MCP tools.
 
 ## Tool resolution rules
 - Normalize names to lowercase alphanumerics and allow containment matches so near-miss names still resolve.

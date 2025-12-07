@@ -43,17 +43,24 @@ class McpControllerTest {
         // Prepare test data
         McpTool tool = new McpTool("test_tool", "Test description", new HashMap<>());
         List<McpTool> tools = Collections.singletonList(tool);
+        
+        McpToolExecutionResponse.ContentItem content = 
+            new McpToolExecutionResponse.ContentItem("text", "{\"tools\":[]}");
+        McpToolExecutionResponse executionResponse = 
+            new McpToolExecutionResponse(Collections.singletonList(content), false);
+        executionResponse.setRequestId("test-request-id");
 
         when(toolMappingService.getAllTools()).thenReturn(tools);
+        when(toolExecutionService.createSuccessResponse(any(), anyString())).thenReturn(executionResponse);
 
         // Execute
-        ResponseEntity<McpToolsResponse> response = controller.listTools();
+        ResponseEntity<McpToolExecutionResponse> response = controller.listTools();
 
         // Verify
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().getTools().size());
-        assertEquals("test_tool", response.getBody().getTools().get(0).getName());
+        assertFalse(response.getBody().getIsError());
+        assertNotNull(response.getBody().getContent());
 
         verify(toolMappingService, times(1)).getAllTools();
     }
@@ -112,8 +119,18 @@ class McpControllerTest {
     void testExecuteToolWithEmptyName() {
         // Prepare test data
         McpToolExecutionRequest request = new McpToolExecutionRequest("", new HashMap<>());
+        
+        McpToolExecutionResponse.ContentItem content = 
+            new McpToolExecutionResponse.ContentItem("text", "Validation error");
+        McpToolExecutionResponse errorResponse = 
+            new McpToolExecutionResponse(Collections.singletonList(content), true);
+        errorResponse.setRequestId("test-request-id");
+        errorResponse.setErrorCode("validation_error");
 
         when(bindingResult.hasErrors()).thenReturn(true);
+        when(bindingResult.getFieldErrors()).thenReturn(Collections.emptyList());
+        when(bindingResult.getGlobalErrors()).thenReturn(Collections.emptyList());
+        when(toolExecutionService.createErrorResponse(any(), anyString(), anyString(), any())).thenReturn(errorResponse);
 
         // Execute
         ResponseEntity<McpToolExecutionResponse> response = controller.executeTool(request, bindingResult);
@@ -130,13 +147,22 @@ class McpControllerTest {
 
     @Test
     void testRefreshTools() {
+        McpToolExecutionResponse.ContentItem content = 
+            new McpToolExecutionResponse.ContentItem("text", "{\"message\":\"Tools refreshed\"}");
+        McpToolExecutionResponse executionResponse = 
+            new McpToolExecutionResponse(Collections.singletonList(content), false);
+        executionResponse.setRequestId("test-request-id");
+
+        when(toolExecutionService.createSuccessResponse(any(), anyString())).thenReturn(executionResponse);
+
         // Execute
-        ResponseEntity<String> response = controller.refreshTools();
+        ResponseEntity<McpToolExecutionResponse> response = controller.refreshTools();
 
         // Verify
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertTrue(response.getBody().contains("refreshed"));
+        assertFalse(response.getBody().getIsError());
+        assertNotNull(response.getBody().getContent());
 
         verify(toolMappingService, times(1)).refreshTools();
     }
