@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,6 +23,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
  */
 @Configuration
 @ConditionalOnWebApplication
+@EnableConfigurationProperties(McpProperties.class)
 public class McpAutoConfiguration {
 
     private static final Logger logger = LoggerFactory.getLogger(McpAutoConfiguration.class);
@@ -37,26 +39,30 @@ public class McpAutoConfiguration {
      * Creates the endpoint discovery service bean.
      *
      * @param handlerMapping the Spring request mapping handler
+     * @param properties the MCP properties
      * @return the endpoint discovery service
      */
     @Bean
     @ConditionalOnMissingBean
-    public EndpointDiscoveryService endpointDiscoveryService(RequestMappingHandlerMapping handlerMapping) {
+    public EndpointDiscoveryService endpointDiscoveryService(RequestMappingHandlerMapping handlerMapping,
+                                                             McpProperties properties) {
         logger.debug("Creating EndpointDiscoveryService bean");
-        return new EndpointDiscoveryService(handlerMapping);
+        return new EndpointDiscoveryService(handlerMapping, properties);
     }
 
     /**
      * Creates the GraphQL discovery service bean.
      *
      * @param applicationContext the Spring application context
+     * @param properties the MCP properties
      * @return the GraphQL discovery service
      */
     @Bean
     @ConditionalOnMissingBean
-    public GraphQLDiscoveryService graphQLDiscoveryService(ApplicationContext applicationContext) {
+    public GraphQLDiscoveryService graphQLDiscoveryService(ApplicationContext applicationContext,
+                                                          McpProperties properties) {
         logger.debug("Creating GraphQLDiscoveryService bean");
-        return new GraphQLDiscoveryService(applicationContext);
+        return new GraphQLDiscoveryService(applicationContext, properties);
     }
 
     /**
