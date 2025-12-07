@@ -110,7 +110,7 @@ public class McpEnhancedFeaturesIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.requestId").exists())
                 .andExpect(jsonPath("$.requestId").isNotEmpty())
-                .andExpect(jsonPath("$.isError").doesNotExist())
+                .andExpect(jsonPath("$.isError").value(false))
                 .andReturn();
 
         String responseBody = result.getResponse().getContentAsString();
