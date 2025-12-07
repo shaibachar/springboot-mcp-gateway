@@ -3,6 +3,7 @@ package com.shaibachar.springbootmcplib.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shaibachar.springbootmcplib.model.EndpointMetadata;
 import com.shaibachar.springbootmcplib.model.GraphQLEndpointMetadata;
+import com.shaibachar.springbootmcplib.model.McpErrorCode;
 import com.shaibachar.springbootmcplib.model.McpToolExecutionResponse;
 import com.shaibachar.springbootmcplib.util.EndpointUtils;
 import org.slf4j.Logger;
@@ -70,7 +71,7 @@ public class McpToolExecutionService {
             EndpointMetadata endpoint = findEndpointForTool(toolName);
             if (endpoint == null) {
                 logger.error("Tool not found: {}", toolName);
-                return createErrorResponse("tool_not_found", requestId, "Tool not found: " + toolName, null);
+                return createErrorResponse(McpErrorCode.TOOL_NOT_FOUND, requestId, "Tool not found: " + toolName, null);
             }
 
             // Invoke the endpoint
@@ -79,9 +80,12 @@ public class McpToolExecutionService {
             // Convert result to response
             return createSuccessResponse(result, requestId);
 
+        } catch (IllegalArgumentException e) {
+            logger.error("Error converting tool arguments for {}", toolName, e);
+            return createErrorResponse(McpErrorCode.SERIALIZATION_ERROR, requestId, "Error processing arguments", null);
         } catch (Exception e) {
             logger.error("Error executing tool: " + toolName, e);
-            return createErrorResponse("execution_error", requestId, "Error executing tool: " + e.getMessage(), null);
+            return createErrorResponse(McpErrorCode.EXECUTION_ERROR, requestId, "Error executing tool: " + e.getMessage(), null);
         }
     }
 
@@ -303,7 +307,7 @@ public class McpToolExecutionService {
      * @param result the result object
      * @return the execution response
      */
-    private McpToolExecutionResponse createSuccessResponse(Object result, String requestId) {
+    public McpToolExecutionResponse createSuccessResponse(Object result, String requestId) {
         try {
             String resultText = objectMapper.writeValueAsString(result);
             McpToolExecutionResponse.ContentItem content =
@@ -311,10 +315,11 @@ public class McpToolExecutionService {
 
             McpToolExecutionResponse response = new McpToolExecutionResponse(Collections.singletonList(content), false);
             response.setRequestId(requestId);
+            response.setErrorCode(null);
             return response;
         } catch (Exception e) {
             logger.error("Error serializing result", e);
-            return createErrorResponse("serialization_error", requestId, "Error processing result", null);
+            return createErrorResponse(McpErrorCode.SERIALIZATION_ERROR, requestId, "Error processing result", null);
         }
     }
 
@@ -324,11 +329,11 @@ public class McpToolExecutionService {
      * @param errorMessage the error message
      * @return the execution response
      */
-    private McpToolExecutionResponse createErrorResponse(String errorCode, String requestId, String errorMessage, Object details) {
+    public McpToolExecutionResponse createErrorResponse(McpErrorCode errorCode, String requestId, String errorMessage, Object details) {
         McpToolExecutionResponse.ContentItem content =
             new McpToolExecutionResponse.ContentItem("text", errorMessage);
 
-        return new McpToolExecutionResponse(Collections.singletonList(content), errorCode, requestId, details);
+        return new McpToolExecutionResponse(Collections.singletonList(content), errorCode.getCode(), requestId, details);
     }
 
     private boolean namesMatch(String candidate, String query) {

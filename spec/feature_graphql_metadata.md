@@ -5,7 +5,7 @@ Expose argument shapes clearly so clients can build valid payloads without guess
 
 ## Contract
 - Each GraphQL argument schema includes `graphqlType`, `javaType`, `nullable`, and existing JSON schema `type`.
-- Required detection reuses GraphQL annotations; `nullable` is the inverse of required.
+- Required detection reuses GraphQL annotations (`@Argument(required=true|false)`), recognizes `Optional`/`@Nullable` hints, and sets `nullable` as the inverse of required.
 - REST parameters also expose `javaType` for parity.
 
 ## Acceptance criteria

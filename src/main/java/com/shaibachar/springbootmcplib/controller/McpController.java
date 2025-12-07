@@ -1,6 +1,10 @@
 package com.shaibachar.springbootmcplib.controller;
 
-import com.shaibachar.springbootmcplib.model.*;
+import com.shaibachar.springbootmcplib.model.McpErrorCode;
+import com.shaibachar.springbootmcplib.model.McpTool;
+import com.shaibachar.springbootmcplib.model.McpToolExecutionRequest;
+import com.shaibachar.springbootmcplib.model.McpToolExecutionResponse;
+import com.shaibachar.springbootmcplib.model.McpToolsResponse;
 import com.shaibachar.springbootmcplib.service.McpToolExecutionService;
 import com.shaibachar.springbootmcplib.service.McpToolMappingService;
 import org.slf4j.Logger;
@@ -10,8 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * REST controller that exposes MCP (Model Context Protocol) endpoints.
@@ -47,19 +50,27 @@ public class McpController {
      * @return response containing the list of tools
      */
     @GetMapping("/tools")
-    public ResponseEntity<McpToolsResponse> listTools() {
-        logger.debug("Received request to list MCP tools");
+    public ResponseEntity<McpToolExecutionResponse> listTools() {
+        String requestId = UUID.randomUUID().toString();
+        logger.debug("Received request to list MCP tools with correlation {}", requestId);
 
         try {
             List<McpTool> tools = toolMappingService.getAllTools();
             logger.debug("Returning {} tools", tools.size());
 
             McpToolsResponse response = new McpToolsResponse(tools);
-            return ResponseEntity.ok(response);
+            McpToolExecutionResponse body = toolExecutionService.createSuccessResponse(response, requestId);
+            return ResponseEntity.ok(body);
 
         } catch (Exception e) {
             logger.error("Error listing tools", e);
-            return ResponseEntity.internalServerError().build();
+            McpToolExecutionResponse errorResponse = createErrorResponse(
+                    McpErrorCode.INTERNAL_ERROR,
+                    requestId,
+                    "Error listing tools",
+                    null
+            );
+            return ResponseEntity.internalServerError().body(errorResponse);
         }
     }
 
@@ -82,10 +93,10 @@ public class McpController {
             if (bindingResult.hasErrors()) {
                 logger.error("Validation failed for tool {}: {}", request.getName(), bindingResult.getAllErrors());
                 McpToolExecutionResponse errorResponse = createErrorResponse(
-                        "validation_error",
+                        McpErrorCode.VALIDATION_ERROR,
                         requestId,
                         "Tool name is required",
-                        bindingResult.getAllErrors()
+                        extractValidationDetails(bindingResult)
                 );
                 return ResponseEntity.badRequest().body(errorResponse);
             }
@@ -107,7 +118,7 @@ public class McpController {
         } catch (Exception e) {
             logger.error("Error executing tool: " + request.getName(), e);
             McpToolExecutionResponse errorResponse = createErrorResponse(
-                    "internal_error",
+                    McpErrorCode.INTERNAL_ERROR,
                     requestId,
                     "Internal error occurred",
                     null
@@ -124,17 +135,26 @@ public class McpController {
      * @return response indicating success
      */
     @PostMapping("/tools/refresh")
-    public ResponseEntity<String> refreshTools() {
-        logger.debug("Received request to refresh MCP tools");
+    public ResponseEntity<McpToolExecutionResponse> refreshTools() {
+        String requestId = UUID.randomUUID().toString();
+        logger.debug("Received request to refresh MCP tools with correlation {}", requestId);
 
         try {
             toolMappingService.refreshTools();
             logger.debug("Tools refreshed successfully");
-            return ResponseEntity.ok("Tools refreshed successfully");
+            Map<String, String> result = Collections.singletonMap("message", "Tools refreshed successfully");
+            McpToolExecutionResponse response = toolExecutionService.createSuccessResponse(result, requestId);
+            return ResponseEntity.ok(response);
 
         } catch (Exception e) {
             logger.error("Error refreshing tools", e);
-            return ResponseEntity.internalServerError().body("Error refreshing tools");
+            McpToolExecutionResponse errorResponse = createErrorResponse(
+                    McpErrorCode.INTERNAL_ERROR,
+                    requestId,
+                    "Error refreshing tools",
+                    null
+            );
+            return ResponseEntity.internalServerError().body(errorResponse);
         }
     }
 
@@ -144,9 +164,26 @@ public class McpController {
      * @param errorMessage the error message
      * @return the error response
      */
-    private McpToolExecutionResponse createErrorResponse(String errorCode, String requestId, String errorMessage, Object details) {
-        McpToolExecutionResponse.ContentItem content =
-                new McpToolExecutionResponse.ContentItem("text", errorMessage);
-        return new McpToolExecutionResponse(java.util.Collections.singletonList(content), errorCode, requestId, details);
+    private McpToolExecutionResponse createErrorResponse(McpErrorCode errorCode, String requestId, String errorMessage, Object details) {
+        return toolExecutionService.createErrorResponse(errorCode, requestId, errorMessage, details);
+    }
+
+    private List<Map<String, Object>> extractValidationDetails(BindingResult bindingResult) {
+        List<Map<String, Object>> details = new ArrayList<>();
+        bindingResult.getFieldErrors().forEach(error -> {
+            Map<String, Object> entry = new HashMap<>();
+            entry.put("field", error.getField());
+            entry.put("message", error.getDefaultMessage());
+            entry.put("code", error.getCode());
+            details.add(entry);
+        });
+        bindingResult.getGlobalErrors().forEach(error -> {
+            Map<String, Object> entry = new HashMap<>();
+            entry.put("object", error.getObjectName());
+            entry.put("message", error.getDefaultMessage());
+            entry.put("code", error.getCode());
+            details.add(entry);
+        });
+        return details;
     }
 }

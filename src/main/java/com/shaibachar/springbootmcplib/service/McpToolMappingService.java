@@ -8,8 +8,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
+import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.*;
+import org.springframework.lang.Nullable;
 
 /**
  * Service responsible for mapping REST and GraphQL endpoints to MCP tools.
@@ -286,15 +288,36 @@ public class McpToolMappingService {
             Class<? extends java.lang.annotation.Annotation> annotationClass = (Class<? extends java.lang.annotation.Annotation>) argumentClass;
             Object argumentAnnotation = param.getAnnotation(annotationClass);
             if (argumentAnnotation != null) {
-                // GraphQL arguments are optional by default in Spring for GraphQL
-                return false;
+                Method requiredMethod = argumentClass.getMethod("required");
+                Object requiredValue = requiredMethod.invoke(argumentAnnotation);
+                if (requiredValue instanceof Boolean) {
+                    return (Boolean) requiredValue;
+                }
             }
         } catch (Exception e) {
             logger.debug("Could not check GraphQL parameter required status");
         }
 
-        // Default to not required for GraphQL
-        return false;
+        if (param.isAnnotationPresent(Nullable.class)) {
+            return false;
+        }
+
+        try {
+            Class<? extends java.lang.annotation.Annotation> nullableAnnotation =
+                    (Class<? extends java.lang.annotation.Annotation>) Class.forName("jakarta.annotation.Nullable");
+            if (param.isAnnotationPresent(nullableAnnotation)) {
+                return false;
+            }
+        } catch (ClassNotFoundException ignored) {
+            // Ignore if Jakarta Nullable is not on the classpath
+        }
+
+        if (Optional.class.isAssignableFrom(param.getType())) {
+            return false;
+        }
+
+        // Default to required when metadata is not explicit
+        return true;
     }
 
     /**
