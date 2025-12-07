@@ -2,6 +2,11 @@
 
 ## Automated
 - `mvn test`
+- Integration tests
+  - `/mcp/tools` returns an MCP envelope with `requestId`, `isError=false`, and non-empty tool list
+  - `/mcp/tools/refresh` responds with `requestId`, `isError=false`, and a text content message containing "refreshed"
+  - `POST /mcp/tools/execute` with blank `name` yields HTTP 400, `errorCode=validation_error`, non-empty `requestId`, and validation `details`
+  - `POST /mcp/tools/execute` with an unknown tool name returns HTTP 400, `errorCode=tool_not_found`, non-empty `requestId`, and an error message in `content`
 
 ## Test Infrastructure
 - **TimeProvider abstraction**: The library uses a `TimeProvider` utility class to abstract system time calls (`System.currentTimeMillis()`). This enables deterministic testing of cache TTL expiration without waiting for real time to pass. Tests can inject a mock `TimeProvider` to simulate time advancement and verify cache expiration behavior.
