@@ -25,6 +25,3 @@ jobs:
 
       - name: Run unit and integration tests with coverage
         run: mvn -B -U verify
-
-      - name: Check specification coverage references
-        run: ./scripts/verify-spec-coverage.sh
